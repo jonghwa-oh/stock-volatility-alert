@@ -1,6 +1,6 @@
 """
 일일 매수 알림 스크립트
-매일 8:50 AM에 실행되어 매수 추천 종목을 분석하고 텔레그램으로 전송
+월-금 8:50 AM에 실행되어 매수 추천 종목을 분석하고 텔레그램으로 전송
 """
 
 from datetime import datetime
@@ -11,6 +11,7 @@ from database import StockDatabase, User, UserStock
 from volatility_analysis import analyze_daily_volatility, visualize_volatility
 from telegram_bot import send_message, send_photo
 from config import TELEGRAM_CONFIG
+from scheduler_config import SCHEDULE_CONFIG
 
 
 def get_unique_tickers():
@@ -166,10 +167,23 @@ def send_daily_alerts():
 
 def main():
     """메인 실행"""
+    now = datetime.now()
+    weekday = now.weekday()  # 0=월요일, 6=일요일
+    
     print("\n" + "="*70)
     print("🌅 일일 매수 알림 시작")
-    print(f"⏰ 실행 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"⏰ 실행 시간: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"📅 요일: {['월', '화', '수', '목', '금', '토', '일'][weekday]}요일")
     print("="*70)
+    
+    # 거래일 체크 (월-금만 실행)
+    trading_days = SCHEDULE_CONFIG.get('trading_days', [0, 1, 2, 3, 4])
+    if weekday not in trading_days:
+        print(f"\n⏸️  오늘은 거래일이 아닙니다. (주말/공휴일)")
+        print(f"💤 다음 거래일에 실행됩니다.")
+        return
+    
+    print(f"✅ 오늘은 거래일입니다. 분석을 시작합니다.")
     
     # 1단계: 모든 종목 분석 (중복 제거)
     print("\n[1/2] 종목 분석 및 차트 생성...")

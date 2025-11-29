@@ -57,7 +57,7 @@ STOCKS = {
 
 # 알림 설정
 ALERT_CONFIG = {
-    'send_daily_report': True,      # 매일 리포트 전송
+    'send_daily_report': True,      # 일일 리포트 전송 (월-금)
     'send_buy_signals': True,       # 매수 신호 전송
     'alert_threshold': 0.8,         # 표준편차의 80% 이상 하락 시 알림
 }

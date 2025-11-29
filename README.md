@@ -219,7 +219,7 @@ MONITORING_TICKERS = {
 
 # 스케줄링
 SCHEDULE = {
-    'daily_analysis_time': '09:30',     # 매일 오전 9:30
+    'daily_analysis_time': '08:50',     # 월-금 오전 8:50
     'realtime_interval': 5,             # 5분마다
     'data_update_time': '08:00',        # 데이터 업데이트
 }

@@ -38,7 +38,7 @@ class MultiUserMonitor:
         print(f"✅ {len(self.notifiers)}명 사용자 텔레그램 초기화")
     
     async def daily_analysis(self):
-        """매일 오전 9:30 - 전체 분석 및 개인별 알림"""
+        """월-금 오전 8:50 - 전체 분석 및 개인별 알림"""
         print("\n" + "="*60)
         print("🌅 일일 분석 시작 (멀티 유저)")
         print("="*60)
@@ -324,7 +324,7 @@ def run_scheduler():
     monitor.init_notifiers()
     
     # 스케줄 등록
-    print(f"\n📅 일일 분석: 매일 {SCHEDULE_CONFIG['daily_analysis_time']}")
+    print(f"\n📅 일일 분석: 월-금 {SCHEDULE_CONFIG['daily_analysis_time']}")
     print(f"⏰ 실시간 체크: {SCHEDULE_CONFIG['realtime_check_interval']}분마다")
     print(f"💾 DB 사용: SQLite (초고속)")
     print("="*60)
