@@ -549,7 +549,7 @@ class StockDatabase:
             return []
         
         cursor.execute('''
-            SELECT DISTINCT uw.ticker, dp.ticker_name
+            SELECT uw.ticker, MAX(dp.ticker_name) as ticker_name
             FROM user_watchlist uw
             LEFT JOIN daily_prices dp ON uw.ticker = dp.ticker
             WHERE uw.user_id = ? AND uw.enabled = 1
