@@ -165,6 +165,13 @@ def visualize_volatility(data):
     target_1x = data['target_1x']
     target_2x = data['target_2x']
     ticker_name = data['ticker_name']
+    ticker = data['ticker']
+    
+    # 차트 제목용: 한국 종목은 이름(티커), 미국 종목은 티커 - 이름
+    if ticker.isdigit():
+        chart_title = f"{ticker_name} ({ticker})"
+    else:
+        chart_title = f"{ticker} - {ticker_name}"
     
     # 그래프 생성 (3개)
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 12))
@@ -177,7 +184,7 @@ def visualize_volatility(data):
     ax1.axhline(y=target_2x, color='darkblue', linestyle='--', linewidth=2,
                 label=f'2차 매수 목표: {target_2x:.2f} ({data["drop_2x"]:.2f}% 하락)')
     
-    ax1.set_title(f'{ticker_name} - 1년간 가격 변동', fontsize=14, fontweight='bold')
+    ax1.set_title(f'{chart_title} - 1년간 가격 변동', fontsize=14, fontweight='bold')
     ax1.set_xlabel('날짜', fontsize=12)
     ax1.set_ylabel('가격', fontsize=12)
     ax1.legend(loc='best', fontsize=10)
@@ -197,7 +204,7 @@ def visualize_volatility(data):
     ax2.fill_between(daily_returns.index, -std_ret, std_ret, alpha=0.1, color='orange', label='1 표준편차 범위')
     ax2.fill_between(daily_returns.index, -2*std_ret, 2*std_ret, alpha=0.05, color='purple', label='2 표준편차 범위')
     
-    ax2.set_title(f'{ticker_name} - 일일 변동률 (수익률 %)', fontsize=14, fontweight='bold')
+    ax2.set_title(f'{chart_title} - 일일 변동률 (수익률 %)', fontsize=14, fontweight='bold')
     ax2.set_xlabel('날짜', fontsize=12)
     ax2.set_ylabel('일일 변동률 (%)', fontsize=12)
     ax2.legend(loc='best', fontsize=9)
@@ -217,7 +224,7 @@ def visualize_volatility(data):
     ax3.axvline(x=-std_ret, color='orange', linestyle=':', linewidth=2.5, label=f'-1 표준편차: -{std_ret:.2f}%')
     ax3.axvline(x=-2*std_ret, color='purple', linestyle=':', linewidth=2.5, label=f'-2 표준편차: -{2*std_ret:.2f}%')
     
-    ax3.set_title(f'{ticker_name} - 일일 변동률 분포', fontsize=14, fontweight='bold')
+    ax3.set_title(f'{chart_title} - 일일 변동률 분포', fontsize=14, fontweight='bold')
     ax3.set_xlabel('일일 변동률 (%)', fontsize=12)
     ax3.set_ylabel('빈도 밀도', fontsize=12)
     ax3.legend(loc='best', fontsize=10)

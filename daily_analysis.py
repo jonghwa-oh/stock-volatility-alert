@@ -142,8 +142,12 @@ def send_daily_alerts():
                 continue
             
             # 차트 전송
-            stock_message = f"📊 {ticker} - {name}\n"
-            stock_message += f"💰 투자금: {user['investment_amount']:,}원\n"
+            # 티커가 숫자면 이름 우선 표시
+            if ticker.isdigit():
+                stock_message = f"📊 {name} ({ticker})\n"
+            else:
+                stock_message = f"📊 {ticker} - {name}\n"
+            stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n"
             
             try:
                 send_photo(
