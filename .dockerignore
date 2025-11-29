@@ -42,7 +42,8 @@ Thumbs.db
 test_*.py
 *_test.py
 
-# 문서 (README는 포함)
+# 문서 (docs 폴더 제외, README는 포함)
+docs/
 *.md
 !README.md
 

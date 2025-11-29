@@ -279,14 +279,21 @@ stock-monitor/
 
 ---
 
-## 📚 추가 문서
+## 📚 문서
 
-- [빠른 시작 가이드](QUICK_START.md)
-- [DB 성능 분석](DB_PERFORMANCE_ANALYSIS.md)
-- [가족 설정 가이드](FAMILY_SETUP_GUIDE.md)
-- [라즈베리파이 가이드](RASPBERRY_PI_GUIDE.md)
-- [시놀로지 Docker 가이드](DS218_DOCKER_GUIDE.md)
-- [텔레그램 봇 설정](봇_설치_가이드.md)
+### 시작하기
+- [빠른 시작 가이드](docs/QUICK_START.md)
+- [다음 단계](docs/NEXT_STEPS.md)
+- [GitHub Push 가이드](docs/GITHUB_PUSH_GUIDE.md)
+
+### 설정
+- [가족 멀티 유저 설정](docs/FAMILY_SETUP_GUIDE.md)
+- [텔레그램 봇 설정](docs/봇_설치_가이드.md)
+
+### 배포
+- [시놀로지 NAS (Docker)](docs/deployment/DS218_DOCKER_GUIDE.md)
+- [시놀로지 NAS (직접 설치)](docs/deployment/SYNOLOGY_SETUP_GUIDE.md)
+- [라즈베리파이 5](docs/deployment/RASPBERRY_PI_GUIDE.md)
 
 ---
 
