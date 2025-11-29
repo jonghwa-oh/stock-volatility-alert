@@ -1,33 +1,29 @@
 """
 설정 파일
-민감한 정보는 암호화된 DB에서 로드
+설정은 stock_data.db의 settings 테이블에서 로드
 """
 
-from secrets_manager import SecretsManager
+from database import StockDatabase
 
 
 def load_config():
-    """암호화된 DB에서 설정 로드"""
+    """DB에서 설정 로드"""
     try:
-        sm = SecretsManager()
+        db = StockDatabase()
         
         # 텔레그램 설정
-        bot_token = sm.get_secret('BOT_TOKEN')
-        chat_id = sm.get_secret('CHAT_ID')
-        
-        if not bot_token or not chat_id:
-            raise ValueError(
-                "텔레그램 설정이 없습니다!\n"
-                "python setup_secrets.py를 먼저 실행하세요."
-            )
+        bot_token = db.get_setting('bot_token')
+        default_chat_id = db.get_setting('default_chat_id')
         
         # 투자 설정
-        default_amount = sm.get_secret('DEFAULT_AMOUNT', '1000000')
+        default_amount = db.get_setting('default_investment_amount', '1000000')
+        
+        db.close()
         
         return {
             'TELEGRAM_CONFIG': {
                 'BOT_TOKEN': bot_token,
-                'CHAT_ID': chat_id,
+                'CHAT_ID': default_chat_id,
             },
             'INVESTMENT_CONFIG': {
                 'default_amount': int(default_amount),
@@ -35,8 +31,17 @@ def load_config():
         }
     except Exception as e:
         print(f"⚠️  설정 로드 실패: {e}")
-        print("python setup_secrets.py를 실행하여 설정하세요.")
-        raise
+        print("user_manager.py를 실행하여 봇 설정을 입력하세요.")
+        # 기본값 반환
+        return {
+            'TELEGRAM_CONFIG': {
+                'BOT_TOKEN': None,
+                'CHAT_ID': None,
+            },
+            'INVESTMENT_CONFIG': {
+                'default_amount': 1000000,
+            }
+        }
 
 
 # 설정 로드

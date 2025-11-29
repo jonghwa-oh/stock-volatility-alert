@@ -12,21 +12,21 @@
 - 🐳 **Docker 지원**: 간편한 배포 및 실행
 - 🍓 **경량 최적화**: 라즈베리파이 5 / 시놀로지 NAS 최적화
 
-## 🔐 보안 시스템
+## 🔐 데이터 관리
 
-**GitHub Public으로 안전하게 공유!**
+**모든 설정을 하나의 DB로 통합 관리!**
 
 ```
-    소스코드 (GitHub Public) ✅
-    ↓
-민감한 정보 (data/secrets.db - 암호화) ✅
-    ↓
-마스터 키 (.env - 로컬만) ✅
+stock_data.db (하나의 DB)
+├── 주식 데이터 (일봉/분봉)
+├── 사용자 정보
+├── 종목 관심 목록
+└── 설정 (봇 토큰, 투자 금액)
 ```
 
-- ✅ 소스코드는 Public으로 공유 가능
-- ✅ 텔레그램 토큰은 암호화되어 로컬 DB에만 저장
-- ✅ GitHub에 민감한 정보 절대 노출 안 됨
+- ✅ 설정 관리 간편
+- ✅ DB 하나만 백업하면 끝
+- ✅ 별도 파일 관리 불필요
 
 ## 🚀 빠른 시작
 
@@ -48,23 +48,23 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. 초기 설정 (민감한 정보 암호화)
+### 3. 초기 설정
 
 ```bash
-python setup_secrets.py
+python init_settings.py
 ```
 
 **입력 예시:**
 ```
-텔레그램 Bot Token: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz
-텔레그램 Chat ID: 123456789
+Bot Token: 8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM
+기본 Chat ID (선택): 6633793503
 기본 투자 금액 (원): 1000000
 ```
 
 이 명령어는:
-- `.env` 파일 생성 (마스터 키)
-- `data/secrets.db` 생성 (암호화된 설정)
-- 민감한 정보를 안전하게 저장
+- DB의 settings 테이블에 설정 저장
+- 텔레그램 봇 토큰 등록
+- 기본 투자 금액 설정
 
 ### 4. DB 초기화 및 데이터 수집
 
@@ -123,10 +123,9 @@ docker-compose exec stock-monitor python data_collector.py init
 
 | 파일 | 설명 |
 |------|------|
-| `secrets_manager.py` | 민감한 정보 암호화 관리 |
-| `setup_secrets.py` | 초기 설정 스크립트 |
-| `config.py` | 설정 로더 (암호화된 DB에서 읽기) |
-| `database.py` | SQLite DB 관리 |
+| `init_settings.py` | 초기 설정 스크립트 |
+| `config.py` | 설정 로더 (DB에서 읽기) |
+| `database.py` | SQLite DB 관리 (설정 포함) |
 | `data_collector.py` | 일봉/분봉 데이터 수집 |
 | `user_manager.py` | 사용자 및 종목 관리 |
 | `daily_analysis.py` | 일일 매수 알림 (8:50 AM) |
@@ -246,8 +245,7 @@ stock-monitor/
 │
 ├── 📁 데이터 폴더
 │   ├── data/                       # 데이터베이스 저장소
-│   │   ├── stock_data.db          # 주식 데이터 DB
-│   │   └── secrets.db             # 암호화된 설정 DB
+│   │   └── stock_data.db          # 통합 DB (주식 데이터 + 설정)
 │   ├── charts/                     # 차트 이미지 (종목별 폴더)
 │   │   ├── TQQQ/
 │   │   │   └── 2024-11-30_TQQQ_...png
@@ -282,13 +280,11 @@ stock-monitor/
 - `requirements.txt`
 - `Dockerfile`, `docker-compose.yml`
 
-### GitHub에 절대 올라가면 안 되는 파일 ❌
-- `.env` (마스터 키)
-- `data/secrets.db` (암호화된 설정)
-- `data/stock_data.db` (주식 데이터)
+### GitHub에 올라가면 안 되는 파일 ❌
+- `data/stock_data.db` (주식 데이터 + 설정)
 - `logs/*.log` (로그 파일)
 - `backup/*.db` (백업 파일)
-- `*.png` (차트 이미지)
+- `charts/` (차트 이미지)
 
 **.gitignore**에 모두 포함되어 있습니다!
 

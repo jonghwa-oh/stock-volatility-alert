@@ -106,6 +106,17 @@ class StockDatabase:
             )
         ''')
         
+        # 설정 테이블 (봇 토큰, 기본값 등)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # 인덱스 생성
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_daily_ticker_date ON daily_prices(ticker, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_minute_ticker_datetime ON minute_prices(ticker, datetime)')
@@ -552,6 +563,56 @@ class StockDatabase:
                 'name': row[1] or row[0]
             })
         return watchlist
+    
+    # ============ 설정 관리 ============
+    
+    def save_setting(self, key: str, value: str, description: str = None):
+        """설정 저장"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO settings (key, value, description, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (key, value, description))
+        
+        conn.commit()
+        print(f"✅ 설정 저장: {key}")
+    
+    def get_setting(self, key: str, default=None):
+        """설정 조회"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
+        result = cursor.fetchone()
+        
+        return result[0] if result else default
+    
+    def list_settings(self):
+        """모든 설정 조회"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT key, value, description FROM settings ORDER BY key')
+        
+        settings = []
+        for row in cursor.fetchall():
+            settings.append({
+                'key': row[0],
+                'value': row[1],
+                'description': row[2]
+            })
+        return settings
+    
+    def delete_setting(self, key: str):
+        """설정 삭제"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute('DELETE FROM settings WHERE key = ?', (key,))
+        conn.commit()
+        print(f"✅ 설정 삭제: {key}")
 
 
 if __name__ == "__main__":
