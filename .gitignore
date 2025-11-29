@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# 민감한 정보 (중요!) 🔐
+secrets.db
+.env
+*.env
+
+# DB (필요시 공유 가능, 하지만 로컬 개발용은 제외)
+stock_data.db
+
+# 로그
+*.log
+monitor.log*
+*.log.*
+
+# 백업
+backup/
+*.db.backup
+
+# 이미지 (자동 생성되는 차트)
+*.png
+*_volatility.png
+*_backtest.png
+*_chart.png
+*_distribution.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+*.iml
+
+# 테스트  
+test_*.py
+
+# 터미널
+terminals/
+
+# OS
+Thumbs.db
+.DS_Store

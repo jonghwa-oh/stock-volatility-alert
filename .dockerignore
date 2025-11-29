@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# 민감한 정보는 볼륨으로 마운트하므로 제외
+# secrets.db는 docker-compose.yml에서 마운트
+# .env는 docker-compose.yml에서 마운트
+
+# 이미지 파일
+*.png
+*.jpg
+*.jpeg
+
+# 로그
+*.log
+*.log.*
+
+# 백업
+backup/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 테스트
+test_*.py
+*_test.py
+
+# 문서 (README는 포함)
+*.md
+!README.md
+
+# 기타
+terminals/
+

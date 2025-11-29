@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  stock-monitor:
+    build: .
+    container_name: stock_monitor
+    restart: unless-stopped
+    
+    volumes:
+      # DB와 설정 파일 영구 저장
+      - ./stock_data.db:/app/stock_data.db
+      - ./secrets.db:/app/secrets.db
+      - ./.env:/app/.env
+      - ./scheduler_config.py:/app/scheduler_config.py
+      - ./backup:/app/backup
+      - ./logs:/app/logs
+    
+    environment:
+      - TZ=Asia/Seoul
+      - PYTHONUNBUFFERED=1
+    
+    # 로그 제한
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # 메모리 제한 (DS218+ 2GB 고려)
+    mem_limit: 512m
+    memswap_limit: 512m
+    
+    # CPU 제한
+    cpus: '1.0'
+
