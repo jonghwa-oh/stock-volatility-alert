@@ -156,10 +156,8 @@ def send_daily_alerts(analysis_results):
                 else:
                     stock_message = f"📊 {ticker} - {name}\n"
                 stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n\n"
-                stock_message += f"📍 -1표준편차 ({data['drop_1x']:.2f}%)\n"
-                stock_message += f"   매수금액: {data['target_1x']:,.0f}원\n\n"
-                stock_message += f"📍 -2표준편차 ({data['drop_2x']:.2f}%)\n"
-                stock_message += f"   매수금액: {data['target_2x']:,.0f}원\n"
+                stock_message += f"1차 매수 목표: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
+                stock_message += f"2차 매수 목표: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
             
             try:
                 send_photo(
