@@ -4,8 +4,8 @@
 
 # 스케줄 설정
 SCHEDULE_CONFIG = {
-    # 일일 분석 시간
-    'daily_analysis_time': '09:30',  # 오전 9시 30분
+    # 일일 분석 시간 (장 시작 전 매수 알림)
+    'daily_analysis_time': '08:50',  # 오전 8시 50분 (장 시작 전)
     
     # 실시간 모니터링
     'realtime_check_interval': 5,  # 5분마다

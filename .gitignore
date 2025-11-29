@@ -29,6 +29,7 @@ backup/*.db.backup
 *.db.backup
 
 # 이미지 (자동 생성되는 차트)
+charts/
 *.png
 *_volatility.png
 *_backtest.png

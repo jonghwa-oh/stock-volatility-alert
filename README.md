@@ -129,7 +129,8 @@ docker-compose exec stock-monitor python data_collector.py init
 | `database.py` | SQLite DB 관리 |
 | `data_collector.py` | 일봉/분봉 데이터 수집 |
 | `user_manager.py` | 사용자 및 종목 관리 |
-| `realtime_monitor_multiuser.py` | 실시간 모니터링 (멀티유저) |
+| `daily_analysis.py` | 일일 매수 알림 (8:50 AM) |
+| `realtime_monitor_multiuser.py` | 실시간 모니터링 (5분마다) |
 | `telegram_bot.py` | 텔레그램 알림 전송 |
 | `volatility_analysis.py` | 변동성 분석 및 차트 생성 |
 | `backtest_strategy.py` | 백테스트 분석 |
@@ -247,6 +248,11 @@ stock-monitor/
 │   ├── data/                       # 데이터베이스 저장소
 │   │   ├── stock_data.db          # 주식 데이터 DB
 │   │   └── secrets.db             # 암호화된 설정 DB
+│   ├── charts/                     # 차트 이미지 (종목별 폴더)
+│   │   ├── TQQQ/
+│   │   │   └── 2024-11-30_TQQQ_...png
+│   │   └── QLD/
+│   │       └── 2024-11-30_QLD_...png
 │   ├── logs/                       # 로그 파일
 │   └── backup/                     # DB 백업
 │

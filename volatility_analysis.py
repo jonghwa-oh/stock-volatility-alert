@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import os
+from pathlib import Path
 
 # 한글 폰트 설정
 plt.rcParams['font.family'] = 'AppleGothic'
@@ -236,12 +238,20 @@ def visualize_volatility(data):
     
     plt.tight_layout()
     
-    # 파일 저장
+    # 파일 저장 (날짜 prefix + 종목별 폴더)
+    today = datetime.now().strftime('%Y-%m-%d')
+    ticker_folder = Path('charts') / data['ticker']
+    ticker_folder.mkdir(parents=True, exist_ok=True)
+    
     safe_name = ticker_name.replace(' ', '_').replace('/', '_')
-    filename = f"{data['ticker']}_{safe_name}_volatility.png"
+    filename = ticker_folder / f"{today}_{data['ticker']}_{safe_name}_volatility.png"
+    
+    # 이미 같은 날짜의 차트가 있으면 덮어쓰기 (중복 방지)
     plt.savefig(filename, dpi=150, bbox_inches='tight')
     print(f"\n📊 차트가 저장되었습니다: {filename}")
     plt.close()
+    
+    return str(filename)  # 파일 경로 반환
 
 
 def main():
