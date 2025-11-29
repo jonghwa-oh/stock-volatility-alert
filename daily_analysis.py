@@ -71,28 +71,26 @@ def analyze_and_generate_charts():
         # 차트 파일 경로
         chart_path = Path('charts') / ticker / f"{today}_{ticker}_{name.replace(' ', '_')}_volatility.png"
         
-        # 이미 오늘 차트가 있으면 재사용
-        if chart_path.exists():
-            print(f"  ✅ 기존 차트 사용: {chart_path}")
-            results[ticker] = {
-                'name': name,
-                'chart_path': str(chart_path),
-                'data': None  # 이미 생성됨
-            }
-            continue
-        
-        # 분석 수행
+        # 분석 수행 (매수 목표가 계산 위해 항상 수행)
         try:
             data = analyze_daily_volatility(ticker, name)
-            if data:
-                # 차트 생성
+            if not data:
+                print(f"  ❌ 분석 실패")
+                continue
+            
+            # 차트가 없으면 생성
+            if chart_path.exists():
+                print(f"  ✅ 기존 차트 사용: {chart_path}")
+                chart_file = str(chart_path)
+            else:
                 chart_file = visualize_volatility(data)
-                results[ticker] = {
-                    'name': name,
-                    'chart_path': chart_file,
-                    'data': data
-                }
                 print(f"  ✅ 새 차트 생성: {chart_file}")
+            
+            results[ticker] = {
+                'name': name,
+                'chart_path': chart_file,
+                'data': data  # 매수 목표가 계산을 위해 항상 저장
+            }
         except Exception as e:
             print(f"  ❌ 분석 실패: {e}")
             continue
@@ -100,7 +98,7 @@ def analyze_and_generate_charts():
     return results
 
 
-def send_daily_alerts():
+def send_daily_alerts(analysis_results):
     """각 사용자에게 맞춤 알림 전송"""
     today = datetime.now().strftime('%Y-%m-%d')
     db = StockDatabase()
@@ -141,13 +139,27 @@ def send_daily_alerts():
                 message += f"⚠️  {ticker} ({name}): 차트 없음\n"
                 continue
             
-            # 차트 전송
-            # 티커가 숫자면 이름 우선 표시
-            if ticker.isdigit():
-                stock_message = f"📊 {name} ({ticker})\n"
+            # 분석 데이터 가져오기
+            result = analysis_results.get(ticker)
+            if not result or not result['data']:
+                # data가 없으면 간단한 메시지만
+                if ticker.isdigit():
+                    stock_message = f"📊 {name} ({ticker})\n"
+                else:
+                    stock_message = f"📊 {ticker} - {name}\n"
+                stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n"
             else:
-                stock_message = f"📊 {ticker} - {name}\n"
-            stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n"
+                # data가 있으면 매수 목표가 포함
+                data = result['data']
+                if ticker.isdigit():
+                    stock_message = f"📊 {name} ({ticker})\n"
+                else:
+                    stock_message = f"📊 {ticker} - {name}\n"
+                stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n\n"
+                stock_message += f"📍 -1표준편차 ({data['drop_1x']:.2f}%)\n"
+                stock_message += f"   매수금액: {data['target_1x']:,.0f}원\n\n"
+                stock_message += f"📍 -2표준편차 ({data['drop_2x']:.2f}%)\n"
+                stock_message += f"   매수금액: {data['target_2x']:,.0f}원\n"
             
             try:
                 send_photo(
@@ -210,7 +222,7 @@ def main():
     
     # 2단계: 사용자별 알림 전송
     print("\n[2/2] 사용자별 알림 전송...")
-    send_daily_alerts()
+    send_daily_alerts(results)
     
     print("\n" + "="*70)
     print("✅ 일일 매수 알림 완료!")
