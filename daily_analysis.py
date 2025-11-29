@@ -7,11 +7,22 @@ from datetime import datetime
 from pathlib import Path
 import os
 
-from database import StockDatabase, User, UserStock
+from database import StockDatabase
 from volatility_analysis import analyze_daily_volatility, visualize_volatility
-from telegram_bot import send_message, send_photo
+from telegram_bot import send_telegram_sync
 from config import TELEGRAM_CONFIG
 from scheduler_config import SCHEDULE_CONFIG
+
+
+def send_message(chat_id, text):
+    """메시지 전송 wrapper"""
+    send_telegram_sync(TELEGRAM_CONFIG['BOT_TOKEN'], chat_id, message=text)
+
+
+def send_photo(chat_id, photo_path, caption=None):
+    """이미지 전송 wrapper"""
+    message = caption if caption else None
+    send_telegram_sync(TELEGRAM_CONFIG['BOT_TOKEN'], chat_id, message=message, photo_path=photo_path)
 
 
 def get_unique_tickers():
@@ -23,13 +34,13 @@ def get_unique_tickers():
     
     unique_tickers = {}  # {ticker: name}
     for user in users:
-        if not user['is_active']:
+        if not user['enabled']:
             continue
         
-        stocks = db.get_user_stocks(user['id'])
-        for stock in stocks:
-            if stock['is_active']:
-                unique_tickers[stock['ticker']] = stock['name']
+        # 사용자의 관심 종목 조회
+        watchlist = db.get_user_watchlist_with_names(user['name'])
+        for stock in watchlist:
+            unique_tickers[stock['ticker']] = stock['name']
     
     db.close()
     return unique_tickers
@@ -98,29 +109,28 @@ def send_daily_alerts():
     users = db.get_all_users()
     
     for user in users:
-        if not user['is_active']:
+        if not user['enabled']:
             continue
         
         print(f"\n👤 {user['name']} 님에게 알림 전송 중...")
         
-        # 사용자 종목 가져오기
-        stocks = db.get_user_stocks(user['id'])
-        active_stocks = [s for s in stocks if s['is_active']]
+        # 사용자 관심 종목 가져오기
+        watchlist = db.get_user_watchlist_with_names(user['name'])
         
-        if not active_stocks:
-            print(f"  ⚠️  활성 종목이 없습니다.")
+        if not watchlist:
+            print(f"  ⚠️  관심 종목이 없습니다.")
             continue
         
         # 요약 메시지
         message = f"🌅 {user['name']}님, 좋은 아침입니다!\n\n"
         message += f"📅 {today}\n"
         message += f"📊 오늘의 매수 전략 분석\n\n"
-        message += f"관심 종목: {len(active_stocks)}개\n"
+        message += f"관심 종목: {len(watchlist)}개\n"
         message += "━━━━━━━━━━━━━━━━━━\n\n"
         
         # 종목별 알림
         sent_charts = 0
-        for stock in active_stocks:
+        for stock in watchlist:
             ticker = stock['ticker']
             name = stock['name']
             
@@ -133,11 +143,11 @@ def send_daily_alerts():
             
             # 차트 전송
             stock_message = f"📊 {ticker} - {name}\n"
-            stock_message += f"💰 투자금: {stock['investment_amount']:,}원\n"
+            stock_message += f"💰 투자금: {user['investment_amount']:,}원\n"
             
             try:
                 send_photo(
-                    user['telegram_chat_id'],
+                    user['chat_id'],
                     str(chart_path),
                     stock_message
                 )
@@ -157,7 +167,7 @@ def send_daily_alerts():
         message += "행운을 빕니다! 🍀"
         
         try:
-            send_message(user['telegram_chat_id'], message)
+            send_message(user['chat_id'], message)
             print(f"  ✅ 요약 메시지 전송 완료")
         except Exception as e:
             print(f"  ❌ 요약 메시지 전송 실패: {e}")
@@ -179,11 +189,10 @@ def main():
     # 거래일 체크 (월-금만 실행)
     trading_days = SCHEDULE_CONFIG.get('trading_days', [0, 1, 2, 3, 4])
     if weekday not in trading_days:
-        print(f"\n⏸️  오늘은 거래일이 아닙니다. (주말/공휴일)")
-        print(f"💤 다음 거래일에 실행됩니다.")
-        return
-    
-    print(f"✅ 오늘은 거래일입니다. 분석을 시작합니다.")
+        print(f"\n⚠️  오늘은 거래일이 아닙니다. (주말/공휴일)")
+        print(f"📊 테스트 모드로 실행합니다...")
+    else:
+        print(f"✅ 오늘은 거래일입니다. 분석을 시작합니다.")
     
     # 1단계: 모든 종목 분석 (중복 제거)
     print("\n[1/2] 종목 분석 및 차트 생성...")
