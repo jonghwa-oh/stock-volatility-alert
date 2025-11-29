@@ -124,7 +124,17 @@ def send_daily_alerts(analysis_results):
         message += f"📅 {today}\n"
         message += f"📊 오늘의 매수 전략 분석\n\n"
         message += f"관심 종목: {len(watchlist)}개\n"
-        message += "━━━━━━━━━━━━━━━━━━\n\n"
+        message += "━━━━━━━━━━━━━━━━━━\n"
+        
+        # 종목 리스트 추가 (한국은 이름, 미국은 티커)
+        for idx, stock in enumerate(watchlist, 1):
+            ticker = stock['ticker']
+            name = stock['name']
+            if ticker.isdigit():  # 한국 주식
+                message += f"{idx}. {name}\n"
+            else:  # 미국 주식
+                message += f"{idx}. {ticker}\n"
+        message += "\n"
         
         # 종목별 알림
         sent_charts = 0
