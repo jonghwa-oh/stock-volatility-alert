@@ -11,7 +11,7 @@ from pathlib import Path
 class SecretsManager:
     """암호화된 민감한 정보 관리"""
     
-    def __init__(self, db_path='secrets.db'):
+    def __init__(self, db_path='data/secrets.db'):
         self.db_path = db_path
         self.cipher = self._get_cipher()
         self._init_db()

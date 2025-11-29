@@ -9,20 +9,23 @@ env/
 ENV/
 
 # 민감한 정보 (중요!) 🔐
-secrets.db
+data/secrets.db
 .env
 *.env
 
 # DB (필요시 공유 가능, 하지만 로컬 개발용은 제외)
-stock_data.db
+data/stock_data.db
+data/*.db
 
 # 로그
+logs/*.log
 *.log
 monitor.log*
 *.log.*
 
 # 백업
-backup/
+backup/*.db
+backup/*.db.backup
 *.db.backup
 
 # 이미지 (자동 생성되는 차트)

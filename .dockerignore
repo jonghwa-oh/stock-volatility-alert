@@ -9,20 +9,16 @@ env/
 ENV/
 
 # 민감한 정보는 볼륨으로 마운트하므로 제외
-# secrets.db는 docker-compose.yml에서 마운트
-# .env는 docker-compose.yml에서 마운트
+# data/, logs/, backup/은 docker-compose.yml에서 마운트
+data/
+logs/
+backup/
+.env
 
 # 이미지 파일
 *.png
 *.jpg
 *.jpeg
-
-# 로그
-*.log
-*.log.*
-
-# 백업
-backup/
 
 # Git
 .git/

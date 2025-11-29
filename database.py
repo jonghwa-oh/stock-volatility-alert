@@ -12,7 +12,7 @@ import pandas as pd
 class StockDatabase:
     """주식 데이터 관리"""
     
-    def __init__(self, db_path='stock_data.db'):
+    def __init__(self, db_path='data/stock_data.db'):
         self.db_path = db_path
         self.conn = None
         self.init_database()

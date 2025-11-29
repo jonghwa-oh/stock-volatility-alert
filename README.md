@@ -17,9 +17,9 @@
 **GitHub Public으로 안전하게 공유!**
 
 ```
-소스코드 (GitHub Public) ✅
+    소스코드 (GitHub Public) ✅
     ↓
-민감한 정보 (secrets.db - 암호화) ✅
+민감한 정보 (data/secrets.db - 암호화) ✅
     ↓
 마스터 키 (.env - 로컬만) ✅
 ```
@@ -63,7 +63,7 @@ python setup_secrets.py
 
 이 명령어는:
 - `.env` 파일 생성 (마스터 키)
-- `secrets.db` 생성 (암호화된 설정)
+- `data/secrets.db` 생성 (암호화된 설정)
 - 민감한 정보를 안전하게 저장
 
 ### 4. DB 초기화 및 데이터 수집
@@ -230,25 +230,40 @@ SCHEDULE = {
 
 ```
 stock-monitor/
-├── secrets_manager.py          # 암호화 관리자
-├── setup_secrets.py            # 초기 설정
-├── config.py                   # 설정 로더
-├── database.py                 # DB 관리
-├── data_collector.py           # 데이터 수집
-├── user_manager.py             # 유저 관리
-├── realtime_monitor_multiuser.py  # 실시간 모니터링
-├── telegram_bot.py             # 텔레그램 봇
-├── volatility_analysis.py      # 변동성 분석
-├── backtest_strategy.py        # 백테스트
-├── scheduler_config.py         # 스케줄 설정
-├── requirements.txt            # 패키지 목록
-├── Dockerfile                  # Docker 이미지
-├── docker-compose.yml          # Docker Compose 설정
-├── .gitignore                  # Git 제외 목록
-├── .env                        # 마스터 키 (로컬만, Git 제외)
-├── secrets.db                  # 암호화된 설정 (로컬만, Git 제외)
-├── stock_data.db               # 주식 데이터 DB
-└── README.md                   # 이 파일
+├── 🐍 Python 소스코드
+│   ├── secrets_manager.py          # 암호화 관리자
+│   ├── setup_secrets.py            # 초기 설정
+│   ├── config.py                   # 설정 로더
+│   ├── database.py                 # DB 관리
+│   ├── data_collector.py           # 데이터 수집
+│   ├── user_manager.py             # 유저 관리
+│   ├── realtime_monitor_multiuser.py  # 실시간 모니터링
+│   ├── telegram_bot.py             # 텔레그램 봇
+│   ├── volatility_analysis.py      # 변동성 분석
+│   ├── backtest_strategy.py        # 백테스트
+│   └── scheduler_config.py         # 스케줄 설정
+│
+├── 📁 데이터 폴더
+│   ├── data/                       # 데이터베이스 저장소
+│   │   ├── stock_data.db          # 주식 데이터 DB
+│   │   └── secrets.db             # 암호화된 설정 DB
+│   ├── logs/                       # 로그 파일
+│   └── backup/                     # DB 백업
+│
+├── 📚 문서
+│   ├── docs/                       # 가이드 문서
+│   └── README.md                   # 이 파일
+│
+├── 🐳 Docker
+│   ├── Dockerfile
+│   └── docker-compose.yml
+│
+├── 🔒 로컬 전용 (Git 제외)
+│   ├── .env                        # 마스터 키
+│   ├── data/*.db                   # DB 파일들
+│   └── logs/*.log                  # 로그 파일들
+│
+└── requirements.txt                # 패키지 목록
 ```
 
 ---
@@ -263,8 +278,10 @@ stock-monitor/
 
 ### GitHub에 절대 올라가면 안 되는 파일 ❌
 - `.env` (마스터 키)
-- `secrets.db` (암호화된 설정)
-- `stock_data.db` (선택적)
+- `data/secrets.db` (암호화된 설정)
+- `data/stock_data.db` (주식 데이터)
+- `logs/*.log` (로그 파일)
+- `backup/*.db` (백업 파일)
 - `*.png` (차트 이미지)
 
 **.gitignore**에 모두 포함되어 있습니다!

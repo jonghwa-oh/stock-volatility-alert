@@ -7,11 +7,12 @@ services:
     restart: unless-stopped
     
     volumes:
-      # DB와 설정 파일 영구 저장
-      - ./stock_data.db:/app/stock_data.db
-      - ./secrets.db:/app/secrets.db
+      # 데이터 폴더 (DB 파일)
+      - ./data:/app/data
+      # 설정 파일
       - ./.env:/app/.env
       - ./scheduler_config.py:/app/scheduler_config.py
+      # 백업 및 로그
       - ./backup:/app/backup
       - ./logs:/app/logs
     
