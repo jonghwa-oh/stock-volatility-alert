@@ -133,12 +133,12 @@ class RealtimeMonitorWS:
             if last_alert and (now - last_alert).seconds < 300:  # 5분
                 return
         
-        # 알림 메시지 구성
+        # 알림 메시지 구성 (차트 이미지 제외)
         level_text = "1차" if level == '1x' else "2차"
         target_price = targets[level]
         drop_rate = targets[f'drop_{level}']
         
-        message = f"🚨 매수 알림! {level_text} 매수 시점 도달\n\n"
+        message = f"🚨 실시간 매수 알림! {level_text} 매수 시점 도달\n\n"
         
         if ticker.isdigit():
             message += f"📊 {name} ({ticker})\n"
@@ -151,15 +151,13 @@ class RealtimeMonitorWS:
         message += f"⏰ {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         
         if level == '1x':
-            message += "💡 1차 매수 타이밍입니다!"
+            message += "💡 1차 매수 타이밍입니다!\n"
         else:
-            message += "💡 2차 매수 타이밍입니다! (2배 투자)"
+            message += "💡 2차 매수 타이밍입니다! (2배 투자)\n"
         
-        # 차트 이미지 첨부
-        today = now.strftime('%Y-%m-%d')
-        chart_path = Path('charts') / ticker / f"{today}_{ticker}_{name.replace(' ', '_')}_volatility.png"
+        message += "\n📊 차트는 오늘 아침 알림을 확인하세요"
         
-        # 모든 사용자에게 알림
+        # 모든 사용자에게 알림 (이미지 없이 텍스트만)
         users = self.db.get_all_users()
         
         for user in users:
@@ -172,19 +170,12 @@ class RealtimeMonitorWS:
                 continue
             
             try:
-                if chart_path.exists():
-                    send_telegram_sync(
-                        self.telegram_config['BOT_TOKEN'],
-                        user['chat_id'],
-                        photo_path=str(chart_path),
-                        message=message
-                    )
-                else:
-                    send_telegram_sync(
-                        self.telegram_config['BOT_TOKEN'],
-                        user['chat_id'],
-                        message=message
-                    )
+                # 텍스트 메시지만 전송 (이미지 제외)
+                send_telegram_sync(
+                    self.telegram_config['BOT_TOKEN'],
+                    user['chat_id'],
+                    message=message
+                )
                 
                 print(f"  ✅ {user['name']}님에게 {level_text} 매수 알림 전송")
                 
