@@ -135,32 +135,36 @@ class HybridRealtimeMonitor:
     
     async def check_and_alert(self, ticker: str, current_price: float):
         """
-        가격 확인 및 알림 전송
+        가격 확인 및 알림 전송 (알림 시간 외에는 DB에만 기록)
         
         Args:
             ticker: 종목코드
             current_price: 현재가
         """
-        # 알림 시간 체크
-        if not self._is_alert_time():
-            return
-        
         if ticker not in self.target_prices:
             return
         
         targets = self.target_prices[ticker]
         name = targets['name']
         
+        # 알림 시간 체크
+        is_alert_time = self._is_alert_time()
+        
         # 1차 매수 목표가 도달 확인
         if current_price <= targets['1x']:
-            await self._send_buy_alert(ticker, name, current_price, '1x', targets)
+            await self._send_buy_alert(ticker, name, current_price, '1x', targets, send_now=is_alert_time)
         
         # 2차 매수 목표가 도달 확인
         if current_price <= targets['2x']:
-            await self._send_buy_alert(ticker, name, current_price, '2x', targets)
+            await self._send_buy_alert(ticker, name, current_price, '2x', targets, send_now=is_alert_time)
     
-    async def _send_buy_alert(self, ticker: str, name: str, current_price: float, level: str, targets: dict):
-        """매수 알림 전송"""
+    async def _send_buy_alert(self, ticker: str, name: str, current_price: float, level: str, targets: dict, send_now: bool = True):
+        """
+        매수 알림 전송 또는 DB 기록
+        
+        Args:
+            send_now: True면 즉시 전송, False면 DB에만 기록
+        """
         # 중복 알림 방지 (5분 내 동일 레벨 알림 방지)
         now = datetime.now()
         if ticker in self.alert_history:
@@ -197,41 +201,53 @@ class HybridRealtimeMonitor:
         
         message += "\n📊 차트는 오늘 아침 알림을 확인하세요"
         
-        # 모든 사용자에게 알림
-        users = self.db.get_all_users()
+        # DB에 기록 (알림 시간 여부와 상관없이 항상)
+        conn = self.db.connect()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO alert_history 
+            (ticker, ticker_name, country, alert_level, target_price, current_price, drop_rate, alert_time, sent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (ticker, name, country, level, target_price, current_price, drop_rate, now.isoformat(), 1 if send_now else 0))
+        conn.commit()
         
-        for user in users:
-            if not user['enabled']:
-                continue
+        # 알림 전송 (알림 시간일 때만)
+        if send_now:
+            users = self.db.get_all_users()
             
-            # 해당 사용자가 이 종목을 관심 종목으로 가지고 있는지 확인
-            conn = self.db.connect()
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT COUNT(*) FROM user_watchlist 
-                WHERE user_id = ? AND ticker = ? AND enabled = 1
-            ''', (user['id'], ticker))
-            
-            if cursor.fetchone()[0] == 0:
-                continue
-            
-            try:
-                send_telegram_sync(
-                    self.telegram_config['BOT_TOKEN'],
-                    user['chat_id'],
-                    message=message
-                )
-                print(f"  ✅ {user['name']}님에게 {level_text} 매수 알림 전송")
+            for user in users:
+                if not user['enabled']:
+                    continue
                 
-            except Exception as e:
-                print(f"  ❌ {user['name']}님 알림 전송 실패: {e}")
+                # 해당 사용자가 이 종목을 관심 종목으로 가지고 있는지 확인
+                cursor.execute('''
+                    SELECT COUNT(*) FROM user_watchlist 
+                    WHERE user_id = ? AND ticker = ? AND enabled = 1
+                ''', (user['id'], ticker))
+                
+                if cursor.fetchone()[0] == 0:
+                    continue
+                
+                try:
+                    send_telegram_sync(
+                        self.telegram_config['BOT_TOKEN'],
+                        user['chat_id'],
+                        message=message
+                    )
+                    print(f"  ✅ {user['name']}님에게 {level_text} 매수 알림 전송")
+                    
+                except Exception as e:
+                    print(f"  ❌ {user['name']}님 알림 전송 실패: {e}")
+            
+            print(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송")
+        else:
+            # 알림 시간 외에는 DB에만 기록
+            print(f"💾 {name} ({ticker}) {level_text} 매수 시점 기록 (알림 시간 외: {now.strftime('%H:%M:%S')})")
         
-        # 알림 이력 기록
+        # 알림 이력 기록 (중복 방지용)
         if ticker not in self.alert_history:
             self.alert_history[ticker] = {}
         self.alert_history[ticker][level] = now
-        
-        print(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송: {current_price:,.0f}원")
     
     async def monitor_korean_stocks_ws(self):
         """한국 주식 WebSocket 모니터링"""

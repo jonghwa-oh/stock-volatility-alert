@@ -118,6 +118,23 @@ class StockDatabase:
             )
         ''')
         
+        # 알림 이력 테이블 (놓친 알림 추적)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS alert_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                ticker_name TEXT NOT NULL,
+                country TEXT NOT NULL,
+                alert_level TEXT NOT NULL,
+                target_price REAL NOT NULL,
+                current_price REAL NOT NULL,
+                drop_rate REAL NOT NULL,
+                alert_time TIMESTAMP NOT NULL,
+                sent BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # 인덱스 생성
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_daily_ticker_date ON daily_prices(ticker, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_minute_ticker_datetime ON minute_prices(ticker, datetime)')
