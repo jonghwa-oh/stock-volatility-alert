@@ -8,9 +8,11 @@ venv/
 env/
 ENV/
 
-# DB (로컬 데이터는 제외)
+# DB & 암호화 키 (로컬 데이터는 제외)
 data/stock_data.db
 data/*.db
+data/.kis_key
+.kis_key
 
 # 로그
 logs/*.log

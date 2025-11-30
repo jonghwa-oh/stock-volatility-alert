@@ -1,6 +1,10 @@
 """
 데이터 수집 시스템
 일봉 & 분봉 데이터 수집 및 DB 저장
+
+데이터 소스 우선순위:
+1. 한국투자증권 API (한국 주식 - 122630, 498400 등)
+2. FinanceDataReader (미국 주식 & 백업)
 """
 
 import FinanceDataReader as fdr
@@ -15,6 +19,61 @@ class DataCollector:
     
     def __init__(self):
         self.db = StockDatabase()
+        self.kis_api = None
+        self._init_kis_api()
+    
+    def _init_kis_api(self):
+        """한국투자증권 API 초기화 (선택적)"""
+        try:
+            from kis_api import KISApi
+            self.kis_api = KISApi()
+            print("✅ 한국투자증권 API 활성화")
+        except Exception as e:
+            print(f"⚠️  한국투자증권 API 비활성화: {e}")
+            print("   FinanceDataReader만 사용합니다.")
+            self.kis_api = None
+    
+    def _is_korean_stock(self, ticker: str) -> bool:
+        """한국 주식 여부 판단 (숫자 6자리)"""
+        return ticker.isdigit() and len(ticker) == 6
+    
+    def _fetch_data_kis(self, ticker: str, name: str, start_date: datetime, end_date: datetime):
+        """한국투자증권 API로 데이터 수집"""
+        if not self.kis_api:
+            return None
+        
+        try:
+            start_str = start_date.strftime('%Y%m%d')
+            end_str = end_date.strftime('%Y%m%d')
+            
+            df = self.kis_api.get_daily_price_history(ticker, start_str, end_str)
+            
+            if df is not None and not df.empty:
+                print(f"  ✅ KIS API: {len(df)}개 데이터")
+                return df
+            else:
+                print(f"  ⚠️  KIS API 데이터 없음")
+                return None
+                
+        except Exception as e:
+            print(f"  ⚠️  KIS API 오류: {e}")
+            return None
+    
+    def _fetch_data_fdr(self, ticker: str, name: str, start_date: datetime, end_date: datetime):
+        """FinanceDataReader로 데이터 수집"""
+        try:
+            df = fdr.DataReader(ticker, start_date, end_date)
+            
+            if df is not None and not df.empty:
+                print(f"  ✅ FDR: {len(df)}개 데이터")
+                return df
+            else:
+                print(f"  ⚠️  FDR 데이터 없음")
+                return None
+                
+        except Exception as e:
+            print(f"  ⚠️  FDR 오류: {e}")
+            return None
     
     def initialize_historical_data(self, years=1):
         """
@@ -47,11 +106,24 @@ class DataCollector:
                     start = start_date
                     print(f"  • 신규 로드: {start.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
                 
-                # 데이터 가져오기
-                df = fdr.DataReader(ticker, start, end_date)
+                # 데이터 가져오기 (KIS API 우선, 실패 시 FDR)
+                df = None
                 
-                if df.empty:
-                    print(f"  ❌ 데이터 없음")
+                if self._is_korean_stock(ticker):
+                    # 한국 주식: KIS API 우선 시도
+                    print(f"  🇰🇷 한국 주식 - KIS API 시도...")
+                    df = self._fetch_data_kis(ticker, name, start, end_date)
+                
+                if df is None or df.empty:
+                    # KIS 실패 또는 미국 주식: FDR 사용
+                    if not self._is_korean_stock(ticker):
+                        print(f"  🇺🇸 미국 주식 - FDR 사용...")
+                    else:
+                        print(f"  🔄 Fallback - FDR 사용...")
+                    df = self._fetch_data_fdr(ticker, name, start, end_date)
+                
+                if df is None or df.empty:
+                    print(f"  ❌ 모든 소스에서 데이터 없음")
                     continue
                 
                 # DB에 저장할 데이터 준비
