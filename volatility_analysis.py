@@ -25,6 +25,10 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
         ticker_name: 종목명
         investment_amount: 투자 금액
     """
+    # 국가 판별 (한국: 숫자 티커, 미국: 알파벳 티커)
+    is_korean = ticker.isdigit()
+    currency = "원" if is_korean else "$"
+    
     print("="*70)
     print(f"📊 {ticker_name} ({ticker}) 일일 변동성 분석")
     print("="*70)
@@ -66,10 +70,24 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     target_1x = current_price * (1 - drop_1x / 100)
     target_2x = current_price * (1 - drop_2x / 100)
     
-    # 결과 출력
+    # 결과 출력 (통화 단위 구분)
+    # 투자금은 항상 원화로 표시 (DB에 원화로 저장되어 있음)
+    if is_korean:
+        price_str = f"{current_price:,.0f}{currency}"
+        target_1x_str = f"{target_1x:,.0f}{currency}"
+        target_2x_str = f"{target_2x:,.0f}{currency}"
+    else:
+        price_str = f"{currency}{current_price:,.2f}"
+        target_1x_str = f"{currency}{target_1x:,.2f}"
+        target_2x_str = f"{currency}{target_2x:,.2f}"
+    
+    # 투자금은 항상 원화
+    invest_1x_str = f"{investment_amount:,.0f}원"
+    invest_2x_str = f"{investment_amount * 2:,.0f}원"
+    
     print(f"\n📈 1년간 일일 변동 분석:")
     print(f"  • 분석 기간: {len(daily_returns)}일")
-    print(f"  • 현재가: {current_price:,.2f}")
+    print(f"  • 현재가: {price_str}")
     print(f"  • 상승일: {up_days}일 ({up_days/len(daily_returns)*100:.1f}%)")
     print(f"  • 하락일: {down_days}일 ({down_days/len(daily_returns)*100:.1f}%)")
     
@@ -84,15 +102,15 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     print(f"\n  📍 1차 매수 시점:")
     print(f"  ├─ 조건: 하루에 표준편차(1배)만큼 하락")
     print(f"  ├─ 하락폭: {drop_1x:.2f}%")
-    print(f"  ├─ 목표가: {target_1x:,.2f}")
-    print(f"  ├─ 투자금: {investment_amount:,.0f}원")
+    print(f"  ├─ 목표가: {target_1x_str}")
+    print(f"  ├─ 투자금: {invest_1x_str}")
     print(f"  └─ 매수량: {investment_amount / target_1x:,.2f}주")
     
     print(f"\n  📍 2차 매수 시점:")
     print(f"  ├─ 조건: 하루에 표준편차(2배)만큼 하락")
     print(f"  ├─ 하락폭: {drop_2x:.2f}%")
-    print(f"  ├─ 목표가: {target_2x:,.2f}")
-    print(f"  ├─ 투자금: {investment_amount * 2:,.0f}원 (2배)")
+    print(f"  ├─ 목표가: {target_2x_str}")
+    print(f"  ├─ 투자금: {invest_2x_str} (2배)")
     print(f"  └─ 매수량: {(investment_amount * 2) / target_2x:,.2f}주")
     
     # 과거 데이터 검증
@@ -168,21 +186,30 @@ def visualize_volatility(data):
     ticker = data['ticker']
     
     # 차트 제목용: 한국 종목은 이름(티커), 미국 종목은 티커 - 이름
-    if ticker.isdigit():
+    is_korean = ticker.isdigit()
+    if is_korean:
         chart_title = f"{ticker_name} ({ticker})"
+        currency = "원"
+        current_str = f"{current:,.0f}{currency}"
+        target_1x_str = f"{target_1x:,.0f}{currency}"
+        target_2x_str = f"{target_2x:,.0f}{currency}"
     else:
         chart_title = f"{ticker} - {ticker_name}"
+        currency = "$"
+        current_str = f"{currency}{current:,.2f}"
+        target_1x_str = f"{currency}{target_1x:,.2f}"
+        target_2x_str = f"{currency}{target_2x:,.2f}"
     
     # 그래프 생성 (3개)
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 12))
     
     # 그래프 1: 가격 차트
     ax1.plot(close_prices.index, close_prices.values, 'b-', linewidth=2, label='종가')
-    ax1.axhline(y=current, color='red', linestyle='-', linewidth=2.5, label=f'현재가: {current:.2f}')
+    ax1.axhline(y=current, color='red', linestyle='-', linewidth=2.5, label=f'현재가: {current_str}')
     ax1.axhline(y=target_1x, color='blue', linestyle='--', linewidth=2, 
-                label=f'1차 매수 목표: {target_1x:.2f} ({data["drop_1x"]:.2f}% 하락)')
+                label=f'1차 매수 목표: {target_1x_str} ({data["drop_1x"]:.2f}% 하락)')
     ax1.axhline(y=target_2x, color='darkblue', linestyle='--', linewidth=2,
-                label=f'2차 매수 목표: {target_2x:.2f} ({data["drop_2x"]:.2f}% 하락)')
+                label=f'2차 매수 목표: {target_2x_str} ({data["drop_2x"]:.2f}% 하락)')
     
     ax1.set_title(f'{chart_title} - 1년간 가격 변동', fontsize=14, fontweight='bold')
     ax1.set_xlabel('날짜', fontsize=12)

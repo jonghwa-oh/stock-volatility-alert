@@ -107,8 +107,12 @@ class HybridRealtimeMonitor:
                     }
                     
                     flag = '🇰🇷' if country == 'KR' else '🇺🇸'
-                    print(f"  {flag} 1차 매수: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)")
-                    print(f"  {flag} 2차 매수: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)")
+                    if country == 'KR':
+                        print(f"  {flag} 1차 매수: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)")
+                        print(f"  {flag} 2차 매수: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)")
+                    else:
+                        print(f"  {flag} 1차 매수: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)")
+                        print(f"  {flag} 2차 매수: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)")
                 else:
                     print(f"  ❌ 분석 실패")
                     
@@ -171,10 +175,18 @@ class HybridRealtimeMonitor:
         country = targets['country']
         flag = '🇰🇷' if country == 'KR' else '🇺🇸'
         
+        # 통화 단위 결정
+        if country == 'KR':
+            price_format = f"{current_price:,.0f}원"
+            target_format = f"{target_price:,.0f}원"
+        else:
+            price_format = f"${current_price:,.2f}"
+            target_format = f"${target_price:,.2f}"
+        
         message = f"🚨 실시간 매수 알림! {level_text} 매수 시점 도달\n\n"
         message += f"{flag} {name} ({ticker})\n"
-        message += f"💰 현재가: {current_price:,.0f}원\n"
-        message += f"🎯 목표가: {target_price:,.0f}원\n"
+        message += f"💰 현재가: {price_format}\n"
+        message += f"🎯 목표가: {target_format}\n"
         message += f"📉 하락률: {drop_rate:.2f}%\n\n"
         message += f"⏰ {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         

@@ -151,23 +151,33 @@ def send_daily_alerts(analysis_results):
             
             # 분석 데이터 가져오기
             result = analysis_results.get(ticker)
+            
+            # 통화 단위 결정 (목표가만, 투자금은 항상 원화)
+            is_korean = ticker.isdigit()
+            
+            # 투자금은 항상 원화로 표시 (DB에 원화로 저장)
+            invest_str = f"{int(user['investment_amount']):,}원"
+            
             if not result or not result['data']:
                 # data가 없으면 간단한 메시지만
-                if ticker.isdigit():
+                if is_korean:
                     stock_message = f"📊 {name} ({ticker})\n"
                 else:
                     stock_message = f"📊 {ticker} - {name}\n"
-                stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n"
+                stock_message += f"💰 투자금: {invest_str}\n"
             else:
                 # data가 있으면 매수 목표가 포함
                 data = result['data']
-                if ticker.isdigit():
+                if is_korean:
                     stock_message = f"📊 {name} ({ticker})\n"
+                    stock_message += f"💰 투자금: {invest_str}\n\n"
+                    stock_message += f"1차 매수 목표: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
+                    stock_message += f"2차 매수 목표: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
                 else:
                     stock_message = f"📊 {ticker} - {name}\n"
-                stock_message += f"💰 투자금: {int(user['investment_amount']):,}원\n\n"
-                stock_message += f"1차 매수 목표: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
-                stock_message += f"2차 매수 목표: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
+                    stock_message += f"💰 투자금: {invest_str}\n\n"
+                    stock_message += f"1차 매수 목표: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)\n"
+                    stock_message += f"2차 매수 목표: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)\n"
             
             try:
                 send_photo(
