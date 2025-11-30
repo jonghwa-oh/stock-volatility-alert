@@ -29,6 +29,10 @@ VOLUME ["/app/data", "/app/backup"]
 HEALTHCHECK --interval=5m --timeout=3s \
   CMD python -c "import sqlite3; sqlite3.connect('/app/data/stock_data.db').close()" || exit 1
 
-# 실행 (하이브리드 실시간 모니터링)
-CMD ["python", "realtime_monitor_hybrid.py"]
+# 시작 스크립트 복사 및 실행 권한
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# 실행 (시작 스크립트)
+CMD ["/app/start.sh"]
 
