@@ -145,6 +145,197 @@ class KISApi:
             print(f"❌ 데이터 처리 오류 ({ticker}): {e}")
             return None
     
+    def get_overseas_stock_price(self, ticker: str, exchange: str = "NAS") -> Optional[dict]:
+        """
+        해외주식 현재가 시세 조회
+        
+        Args:
+            ticker: 종목코드 (ex: AAPL, TSLA, SOXL)
+            exchange: 거래소 코드 (NAS=나스닥, NYS=뉴욕, AMS=아멕스)
+        
+        Returns:
+            dict: 주식 시세 정보 또는 None
+        """
+        url = f"{self.base_url}/uapi/overseas-price/v1/quotations/price"
+        
+        # TR_ID: HHDFS00000300 (해외주식 현재가)
+        headers = self.auth.get_headers(tr_id="HHDFS00000300")
+        
+        params = {
+            "AUTH": "",
+            "EXCD": exchange,  # 거래소 코드
+            "SYMB": ticker     # 종목코드
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':  # 성공
+                output = result.get('output', {})
+                
+                # 빈 문자열 처리
+                def safe_float(value, default=0.0):
+                    try:
+                        return float(value) if value and value != '' else default
+                    except (ValueError, TypeError):
+                        return default
+                
+                current_price = safe_float(output.get('last'))
+                open_price = safe_float(output.get('open'))
+                high_price = safe_float(output.get('high'))
+                low_price = safe_float(output.get('low'))
+                prev_close = safe_float(output.get('base'))
+                
+                change_price = current_price - prev_close
+                change_rate = (change_price / prev_close * 100) if prev_close > 0 else 0
+                
+                def safe_int(value, default=0):
+                    try:
+                        return int(value) if value and value != '' else default
+                    except (ValueError, TypeError):
+                        return default
+                
+                return {
+                    'ticker': ticker,
+                    'name': output.get('name', ticker),  # 종목명
+                    'current_price': current_price,  # 현재가
+                    'open_price': open_price,  # 시가
+                    'high_price': high_price,  # 고가
+                    'low_price': low_price,  # 저가
+                    'prev_close': prev_close,  # 전일종가
+                    'change_price': change_price,  # 전일대비
+                    'change_rate': change_rate,  # 전일대비율
+                    'volume': safe_int(output.get('tvol')),  # 거래량
+                    'exchange': exchange,
+                    'timestamp': datetime.now()
+                }
+            else:
+                print(f"⚠️  {ticker} ({exchange}) 시세 조회 실패: {result.get('msg1', 'Unknown error')}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ API 요청 오류 ({ticker}): {e}")
+            return None
+        except Exception as e:
+            print(f"❌ 데이터 처리 오류 ({ticker}): {e}")
+            return None
+    
+    def get_overseas_daily_price_history(self, ticker: str, exchange: str = "NAS", 
+                                         start_date: str = None, end_date: str = None) -> Optional[pd.DataFrame]:
+        """
+        해외주식 일봉 데이터 조회
+        
+        Args:
+            ticker: 종목코드
+            exchange: 거래소 코드 (NAS=나스닥, NYS=뉴욕)
+            start_date: 시작일 (YYYYMMDD)
+            end_date: 종료일 (YYYYMMDD)
+        
+        Returns:
+            DataFrame: 일봉 데이터 또는 None
+        """
+        if not end_date:
+            end_date = datetime.now().strftime('%Y%m%d')
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
+        
+        url = f"{self.base_url}/uapi/overseas-price/v1/quotations/dailyprice"
+        
+        # TR_ID: HHDFS76240000 (해외주식 기간별시세)
+        headers = self.auth.get_headers(tr_id="HHDFS76240000")
+        
+        params = {
+            "AUTH": "",
+            "EXCD": exchange,
+            "SYMB": ticker,
+            "GUBN": "0",  # 0=일봉, 1=주봉, 2=월봉
+            "BYMD": end_date,  # 조회 기준일
+            "MODP": "1"  # 0=수정주가 미반영, 1=반영
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':  # 성공
+                output2 = result.get('output2', [])
+                
+                if not output2:
+                    print(f"⚠️  {ticker} ({exchange}) 일봉 데이터 없음")
+                    return None
+                
+                # DataFrame 변환
+                def safe_float(value, default=0.0):
+                    try:
+                        return float(value) if value and value != '' else default
+                    except (ValueError, TypeError):
+                        return default
+                
+                def safe_int(value, default=0):
+                    try:
+                        return int(value) if value and value != '' else default
+                    except (ValueError, TypeError):
+                        return default
+                
+                data = []
+                for item in output2:
+                    date_str = item.get('xymd', '')  # YYYYMMDD
+                    if start_date <= date_str <= end_date:
+                        data.append({
+                            'Date': datetime.strptime(date_str, '%Y%m%d'),
+                            'Open': safe_float(item.get('open')),
+                            'High': safe_float(item.get('high')),
+                            'Low': safe_float(item.get('low')),
+                            'Close': safe_float(item.get('clos')),
+                            'Volume': safe_int(item.get('tvol'))
+                        })
+                
+                if not data:
+                    print(f"⚠️  {ticker} ({exchange}) 기간 내 데이터 없음 ({start_date}~{end_date})")
+                    return None
+                
+                df = pd.DataFrame(data)
+                df.set_index('Date', inplace=True)
+                df.sort_index(inplace=True)
+                
+                print(f"✅ {ticker} ({exchange}) 일봉 데이터 수집: {len(df)}개")
+                return df
+            else:
+                print(f"⚠️  {ticker} ({exchange}) 일봉 조회 실패: {result.get('msg1', 'Unknown error')}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ API 요청 오류 ({ticker}): {e}")
+            return None
+        except Exception as e:
+            print(f"❌ 데이터 처리 오류 ({ticker}): {e}")
+            return None
+    
+    def get_exchange_code(self, ticker: str) -> str:
+        """
+        티커로 거래소 코드 추측
+        
+        Args:
+            ticker: 종목코드
+        
+        Returns:
+            str: 거래소 코드 (NAS, NYS, AMS)
+        """
+        # 나스닥 주요 종목들
+        nasdaq_tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 
+                          'TSLA', 'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 
+                          'CSCO', 'TQQQ', 'QQQ', 'SOXL', 'QLD', 'TECL']
+        
+        if ticker.upper() in nasdaq_tickers:
+            return "NAS"
+        else:
+            return "NYS"  # 기본값: 뉴욕증권거래소
+    
     def close(self):
         """리소스 정리"""
         if self.auth:

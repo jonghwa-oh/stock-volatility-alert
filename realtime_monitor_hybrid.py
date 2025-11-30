@@ -265,13 +265,23 @@ class HybridRealtimeMonitor:
             print(f"⚠️  WebSocket 오류: {e}")
     
     async def monitor_us_stocks_poll(self):
-        """미국 주식 폴링 모니터링 (1분 간격)"""
+        """미국 주식 폴링 모니터링 (1분 간격) - KIS API 우선"""
         us_stocks = {t: p for t, p in self.target_prices.items() if p['country'] == 'US'}
         
         if not us_stocks:
             return
         
         print(f"\n🇺🇸 미국 주식 폴링 모니터링 시작... ({len(us_stocks)}개)")
+        
+        # KIS API 초기화
+        kis_api = None
+        try:
+            from kis_api import KISApi
+            kis_api = KISApi()
+            print(f"  ✅ KIS API 활성화 (미국 주식)")
+        except Exception as e:
+            print(f"  ⚠️  KIS API 비활성화: {e}")
+            print(f"     FinanceDataReader로 대체합니다.")
         
         while True:
             # 알림 시간 체크
@@ -282,11 +292,26 @@ class HybridRealtimeMonitor:
             
             for ticker, targets in us_stocks.items():
                 try:
-                    # 현재가 조회 (FDR)
-                    df = fdr.DataReader(ticker, datetime.now().date(), datetime.now())
+                    current_price = None
                     
-                    if df is not None and not df.empty:
-                        current_price = float(df['Close'].iloc[-1])
+                    # 1순위: KIS API
+                    if kis_api:
+                        try:
+                            exchange = kis_api.get_exchange_code(ticker)
+                            price_info = kis_api.get_overseas_stock_price(ticker, exchange)
+                            if price_info:
+                                current_price = price_info['current_price']
+                        except Exception as e:
+                            print(f"  ⚠️  KIS API 오류 ({ticker}): {e}")
+                    
+                    # 2순위: FDR (Fallback)
+                    if current_price is None:
+                        df = fdr.DataReader(ticker, datetime.now().date(), datetime.now())
+                        if df is not None and not df.empty:
+                            current_price = float(df['Close'].iloc[-1])
+                    
+                    # 알림 확인
+                    if current_price:
                         await self.check_and_alert(ticker, current_price)
                 
                 except Exception as e:

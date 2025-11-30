@@ -3,8 +3,8 @@
 일봉 & 분봉 데이터 수집 및 DB 저장
 
 데이터 소스 우선순위:
-1. 한국투자증권 API (한국 주식 - 122630, 498400 등)
-2. FinanceDataReader (미국 주식 & 백업)
+1. 한국투자증권 API (한국 + 미국 주식 모두)
+2. FinanceDataReader (백업)
 """
 
 import FinanceDataReader as fdr
@@ -38,7 +38,7 @@ class DataCollector:
         return ticker.isdigit() and len(ticker) == 6
     
     def _fetch_data_kis(self, ticker: str, name: str, start_date: datetime, end_date: datetime):
-        """한국투자증권 API로 데이터 수집"""
+        """한국투자증권 API로 데이터 수집 (한국 + 미국 주식)"""
         if not self.kis_api:
             return None
         
@@ -46,7 +46,14 @@ class DataCollector:
             start_str = start_date.strftime('%Y%m%d')
             end_str = end_date.strftime('%Y%m%d')
             
-            df = self.kis_api.get_daily_price_history(ticker, start_str, end_str)
+            # 한국 주식 vs 미국 주식 구분
+            if self._is_korean_stock(ticker):
+                # 한국 주식: 국내주식 API
+                df = self.kis_api.get_daily_price_history(ticker, start_str, end_str)
+            else:
+                # 미국 주식: 해외주식 API
+                exchange = self.kis_api.get_exchange_code(ticker)
+                df = self.kis_api.get_overseas_daily_price_history(ticker, exchange, start_str, end_str)
             
             if df is not None and not df.empty:
                 print(f"  ✅ KIS API: {len(df)}개 데이터")
