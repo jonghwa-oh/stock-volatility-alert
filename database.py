@@ -99,6 +99,7 @@ class StockDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 ticker TEXT NOT NULL,
+                country TEXT DEFAULT 'US',
                 enabled BOOLEAN DEFAULT 1,
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id),
