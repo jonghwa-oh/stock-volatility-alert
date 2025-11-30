@@ -123,6 +123,65 @@ class KISAuth:
         
         return headers
     
+    def get_websocket_approval_key(self):
+        """
+        WebSocket 접속을 위한 approval key 발급
+        
+        Returns:
+            str: approval key
+        """
+        url = f"{self.BASE_URL}/oauth2/Approval"
+        
+        headers = {
+            "content-type": "application/json"
+        }
+        
+        data = {
+            "grant_type": "client_credentials",
+            "appkey": self.credentials['app_key'],
+            "secretkey": self.credentials['app_secret']
+        }
+        
+        try:
+            # 캐시된 approval key 확인
+            cached_key = self.db.get_setting('kis_approval_key')
+            cached_expired = self.db.get_setting('kis_approval_expired')
+            
+            if cached_key and cached_expired:
+                try:
+                    expired_dt = datetime.fromisoformat(cached_expired)
+                    if datetime.now() < (expired_dt - timedelta(minutes=5)):
+                        print(f"✅ 캐시된 approval key 사용")
+                        return cached_key
+                except:
+                    pass
+            
+            print("🔑 WebSocket approval key 발급 중...")
+            response = requests.post(url, headers=headers, json=data)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('approval_key'):
+                approval_key = result['approval_key']
+                # approval key는 24시간 유효
+                expired = datetime.now() + timedelta(hours=24)
+                
+                # DB에 저장
+                self.db.save_setting('kis_approval_key', approval_key, 'WebSocket approval key')
+                self.db.save_setting('kis_approval_expired', expired.isoformat(), 'approval key 만료 시간')
+                
+                print(f"✅ Approval key 발급 성공!")
+                return approval_key
+            else:
+                raise Exception(f"Approval key 발급 실패: {result}")
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ API 요청 오류: {e}")
+            if hasattr(e.response, 'text'):
+                print(f"   응답: {e.response.text}")
+            raise
+    
     def close(self):
         """리소스 정리"""
         if self.db:
