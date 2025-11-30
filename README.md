@@ -261,15 +261,22 @@ SCHEDULE = {
 ```
 stock-monitor/
 ├── 🐍 Python 소스코드
-│   ├── secrets_manager.py          # 암호화 관리자
-│   ├── setup_secrets.py            # 초기 설정
+│   ├── init_settings.py            # 초기 설정 (Telegram)
+│   ├── init_kis_settings.py        # KIS API 설정
+│   ├── export_settings.py          # 설정 내보내기 ⭐ NEW
+│   ├── import_settings.py          # 설정 가져오기 ⭐ NEW
 │   ├── config.py                   # 설정 로더
 │   ├── database.py                 # DB 관리
 │   ├── data_collector.py           # 데이터 수집
 │   ├── user_manager.py             # 유저 관리
-│   ├── realtime_monitor_multiuser.py  # 실시간 모니터링
+│   ├── daily_analysis.py           # 일일 분석 (월-금 8:50)
+│   ├── realtime_monitor_hybrid.py  # 실시간 모니터링 (하이브리드)
 │   ├── telegram_bot.py             # 텔레그램 봇
 │   ├── volatility_analysis.py      # 변동성 분석
+│   ├── kis_auth.py                 # KIS API 인증
+│   ├── kis_api.py                  # KIS REST API
+│   ├── kis_websocket.py            # KIS WebSocket
+│   ├── kis_crypto.py               # KIS 암호화
 │   ├── backtest_strategy.py        # 백테스트
 │   └── scheduler_config.py         # 스케줄 설정
 │
@@ -343,6 +350,7 @@ stock-monitor/
 - [시놀로지 NAS (Docker)](docs/deployment/DS218_DOCKER_GUIDE.md)
 - [시놀로지 NAS (직접 설치)](docs/deployment/SYNOLOGY_SETUP_GUIDE.md)
 - [라즈베리파이 5](docs/deployment/RASPBERRY_PI_GUIDE.md)
+- [**NAS 설정 마이그레이션**](docs/deployment/NAS_MIGRATION_GUIDE.md) ⭐ 추천!
 
 ---
 

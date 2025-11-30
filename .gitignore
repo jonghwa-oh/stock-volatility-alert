@@ -14,6 +14,10 @@ data/*.db
 data/.kis_key
 .kis_key
 
+# Settings backup (민감한 정보 포함)
+settings_backup.json
+settings_backup_*.json
+
 # 로그
 logs/*.log
 *.log
