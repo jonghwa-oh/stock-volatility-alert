@@ -27,10 +27,11 @@ services:
         max-size: "10m"
         max-file: "3"
     
-    # 메모리 제한 (DS218+ 2GB 고려)
-    mem_limit: 512m
-    memswap_limit: 512m
-    
-    # CPU 제한
-    cpus: '1.0'
+    # 리소스 제한 (시놀로지 호환)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
