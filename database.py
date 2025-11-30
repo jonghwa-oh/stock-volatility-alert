@@ -564,6 +564,32 @@ class StockDatabase:
             })
         return watchlist
     
+    def get_user_watchlist_with_country(self, user_name: str) -> List[Dict]:
+        """사용자 관심 종목 목록 (종목명 + 국가 정보 포함)"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        user = self.get_user(user_name)
+        if not user:
+            return []
+        
+        cursor.execute('''
+            SELECT uw.ticker, MAX(dp.ticker_name) as ticker_name, uw.country
+            FROM user_watchlist uw
+            LEFT JOIN daily_prices dp ON uw.ticker = dp.ticker
+            WHERE uw.user_id = ? AND uw.enabled = 1
+            GROUP BY uw.ticker
+        ''', (user['id'],))
+        
+        watchlist = []
+        for row in cursor.fetchall():
+            watchlist.append({
+                'ticker': row[0],
+                'name': row[1] or row[0],
+                'country': row[2] or 'US'
+            })
+        return watchlist
+    
     # ============ 설정 관리 ============
     
     def save_setting(self, key: str, value: str, description: str = None):
