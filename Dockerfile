@@ -27,8 +27,8 @@ VOLUME ["/app/data", "/app/backup"]
 
 # 헬스체크
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD python -c "import sqlite3; sqlite3.connect('/app/stock_data.db').close()" || exit 1
+  CMD python -c "import sqlite3; sqlite3.connect('/app/data/stock_data.db').close()" || exit 1
 
-# 실행
-CMD ["python", "realtime_monitor_multiuser.py"]
+# 실행 (하이브리드 실시간 모니터링)
+CMD ["python", "realtime_monitor_hybrid.py"]
 
