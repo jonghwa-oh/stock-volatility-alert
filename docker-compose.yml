@@ -7,14 +7,15 @@ services:
     restart: unless-stopped
     
     volumes:
-      # 데이터 폴더 (DB 파일)
+      # 데이터 폴더 (DB 파일, 설정 포함)
       - ./data:/app/data
       # 설정 파일
-      - ./.env:/app/.env
       - ./scheduler_config.py:/app/scheduler_config.py
       # 백업 및 로그
       - ./backup:/app/backup
       - ./logs:/app/logs
+      # 차트 이미지
+      - ./charts:/app/charts
     
     environment:
       - TZ=Asia/Seoul
