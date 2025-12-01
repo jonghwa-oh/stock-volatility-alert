@@ -7,12 +7,13 @@ import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from database import StockDatabase
-from daily_analysis import send_daily_alerts, analyze_all_stocks
+from daily_analysis import send_daily_alerts, analyze_and_generate_charts
 from volatility_analysis import analyze_daily_volatility
 from config import load_config
 from kis_api import KISApi
 import FinanceDataReader as fdr
 from datetime import datetime
+import traceback
 
 
 class TelegramBotCommandHandler:
@@ -292,13 +293,22 @@ class TelegramBotCommandHandler:
         
         try:
             # 분석 실행
-            analysis_results = analyze_all_stocks()
+            analysis_results = analyze_and_generate_charts()
+            
+            if not analysis_results:
+                await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
+                return
             
             # 알림 전송
             send_daily_alerts(analysis_results)
             
+            await update.message.reply_text("✅ 분석 완료! 차트를 확인하세요.")
+            
         except Exception as e:
-            await update.message.reply_text(f"❌ 분석 실패: {str(e)}")
+            await update.message.reply_text(f"❌ 분석 실패: {str(e)}\n\n{traceback.format_exc()}")
+            print(f"❌ 분석 실패: {e}")
+            import traceback
+            traceback.print_exc()
     
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
