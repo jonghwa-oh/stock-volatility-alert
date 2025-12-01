@@ -42,7 +42,14 @@ python daily_updater.py &
 UPDATER_PID=$!
 echo "   PID: $UPDATER_PID"
 
-# 4. 실시간 모니터링 시작
+# 4. 텔레그램 봇 커맨드 핸들러 백그라운드 실행
+echo ""
+echo "🤖 텔레그램 봇 커맨드 핸들러 시작..."
+python telegram_bot_commands.py &
+BOT_PID=$!
+echo "   PID: $BOT_PID"
+
+# 5. 실시간 모니터링 시작
 echo ""
 echo "=================================="
 echo "🎯 실시간 모니터링 시작"
@@ -51,4 +58,5 @@ python realtime_monitor_hybrid.py
 
 # 종료 시 백그라운드 프로세스도 종료
 kill $UPDATER_PID 2>/dev/null
+kill $BOT_PID 2>/dev/null
 
