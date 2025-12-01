@@ -31,11 +31,11 @@ class HybridRealtimeMonitor:
         self.alert_history = {}  # {ticker: {'1x': timestamp, '2x': timestamp}}
         
         # 알림 시간 설정
-        self.alert_start_time = time(9, 0)   # 09:00
+        self.alert_start_time = time(8, 0)   # 08:00
         self.alert_end_time = time(23, 59)   # 24:00
     
     def _is_alert_time(self) -> bool:
-        """알림 가능 시간 확인 (09:00~24:00)"""
+        """알림 가능 시간 확인 (08:00~24:00)"""
         now = datetime.now().time()
         return self.alert_start_time <= now <= self.alert_end_time
     
