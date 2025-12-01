@@ -64,9 +64,11 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     
     # 현재가 기준 매수 목표가 계산
     # 일일 표준편차만큼 하락 시
+    drop_05x = std_return * 0.5  # 예: 1% (테스트용)
     drop_1x = std_return  # 예: 2%
     drop_2x = std_return * 2  # 예: 4%
     
+    target_05x = current_price * (1 - drop_05x / 100)
     target_1x = current_price * (1 - drop_1x / 100)
     target_2x = current_price * (1 - drop_2x / 100)
     
@@ -74,14 +76,17 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     # 투자금은 항상 원화로 표시 (DB에 원화로 저장되어 있음)
     if is_korean:
         price_str = f"{current_price:,.0f}{currency}"
+        target_05x_str = f"{target_05x:,.0f}{currency}"
         target_1x_str = f"{target_1x:,.0f}{currency}"
         target_2x_str = f"{target_2x:,.0f}{currency}"
     else:
         price_str = f"{currency}{current_price:,.2f}"
+        target_05x_str = f"{currency}{target_05x:,.2f}"
         target_1x_str = f"{currency}{target_1x:,.2f}"
         target_2x_str = f"{currency}{target_2x:,.2f}"
     
     # 투자금은 항상 원화
+    invest_05x_str = f"{investment_amount * 0.5:,.0f}원"  # 0.5배
     invest_1x_str = f"{investment_amount:,.0f}원"
     invest_2x_str = f"{investment_amount * 2:,.0f}원"
     
@@ -99,6 +104,13 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     print(f"  • 최대 하락: {max_loss:+.2f}%")
     
     print(f"\n💰 매수 전략 (일일 변동폭 기준):")
+    print(f"\n  🧪 테스트 매수 시점 (0.5배):")
+    print(f"  ├─ 조건: 하루에 표준편차(0.5배)만큼 하락")
+    print(f"  ├─ 하락폭: {drop_05x:.2f}%")
+    print(f"  ├─ 목표가: {target_05x_str}")
+    print(f"  ├─ 투자금: {invest_05x_str} (0.5배)")
+    print(f"  └─ 매수량: {(investment_amount * 0.5) / target_05x:,.2f}주")
+    
     print(f"\n  📍 1차 매수 시점:")
     print(f"  ├─ 조건: 하루에 표준편차(1배)만큼 하락")
     print(f"  ├─ 하락폭: {drop_1x:.2f}%")
@@ -158,6 +170,8 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
         'std_return': std_return,
         'max_gain': max_gain,
         'max_loss': max_loss,
+        'drop_05x': drop_05x,
+        'target_05x': target_05x,
         'target_1x': target_1x,
         'target_2x': target_2x,
         'drop_1x': drop_1x,
@@ -205,7 +219,19 @@ def visualize_volatility(data):
     
     # 그래프 1: 가격 차트
     ax1.plot(close_prices.index, close_prices.values, 'b-', linewidth=2, label='종가')
+    # 현재가 및 목표가 라인
+    target_05x = data['target_05x']
+    drop_05x = data['drop_05x']
+    
+    # 통화 단위 결정
+    if is_korean:
+        target_05x_str = f"{target_05x:,.0f}{currency}"
+    else:
+        target_05x_str = f"{currency}{target_05x:,.2f}"
+    
     ax1.axhline(y=current, color='red', linestyle='-', linewidth=2.5, label=f'현재가: {current_str}')
+    ax1.axhline(y=target_05x, color='lightblue', linestyle=':', linewidth=2, 
+                label=f'테스트 매수: {target_05x_str} ({drop_05x:.2f}% 하락)')
     ax1.axhline(y=target_1x, color='blue', linestyle='--', linewidth=2, 
                 label=f'1차 매수 목표: {target_1x_str} ({data["drop_1x"]:.2f}% 하락)')
     ax1.axhline(y=target_2x, color='darkblue', linestyle='--', linewidth=2,

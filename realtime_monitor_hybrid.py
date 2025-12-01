@@ -98,19 +98,23 @@ class HybridRealtimeMonitor:
                 
                 if data:
                     self.target_prices[ticker] = {
+                        '05x': data['target_05x'],
                         '1x': data['target_1x'],
                         '2x': data['target_2x'],
                         'name': name,
                         'country': country,
+                        'drop_05x': data['drop_05x'],
                         'drop_1x': data['drop_1x'],
                         'drop_2x': data['drop_2x']
                     }
                     
                     flag = '🇰🇷' if country == 'KR' else '🇺🇸'
                     if country == 'KR':
+                        print(f"  {flag} 테스트 매수: {data['target_05x']:,.0f}원 ({data['drop_05x']:.2f}% 하락)")
                         print(f"  {flag} 1차 매수: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)")
                         print(f"  {flag} 2차 매수: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)")
                     else:
+                        print(f"  {flag} 테스트 매수: ${data['target_05x']:,.2f} ({data['drop_05x']:.2f}% 하락)")
                         print(f"  {flag} 1차 매수: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)")
                         print(f"  {flag} 2차 매수: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)")
                 else:
@@ -150,6 +154,10 @@ class HybridRealtimeMonitor:
         # 알림 시간 체크
         is_alert_time = self._is_alert_time()
         
+        # 테스트 매수 목표가 도달 확인 (0.5x)
+        if current_price <= targets['05x']:
+            await self._send_buy_alert(ticker, name, current_price, '05x', targets, send_now=is_alert_time)
+        
         # 1차 매수 목표가 도달 확인
         if current_price <= targets['1x']:
             await self._send_buy_alert(ticker, name, current_price, '1x', targets, send_now=is_alert_time)
@@ -173,7 +181,13 @@ class HybridRealtimeMonitor:
                 return
         
         # 알림 메시지 구성
-        level_text = "1차" if level == '1x' else "2차"
+        if level == '05x':
+            level_text = "🧪 테스트"
+        elif level == '1x':
+            level_text = "1차"
+        else:
+            level_text = "2차"
+        
         target_price = targets[level]
         drop_rate = targets[f'drop_{level}']
         country = targets['country']
@@ -194,7 +208,9 @@ class HybridRealtimeMonitor:
         message += f"📉 하락률: {drop_rate:.2f}%\n\n"
         message += f"⏰ {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         
-        if level == '1x':
+        if level == '05x':
+            message += "💡 🧪 테스트 매수 타이밍입니다! (0.5배 투자)\n"
+        elif level == '1x':
             message += "💡 1차 매수 타이밍입니다!\n"
         else:
             message += "💡 2차 매수 타이밍입니다! (2배 투자)\n"

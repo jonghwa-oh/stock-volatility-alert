@@ -171,11 +171,13 @@ def send_daily_alerts(analysis_results):
                 if is_korean:
                     stock_message = f"📊 {name} ({ticker})\n"
                     stock_message += f"💰 투자금: {invest_str}\n\n"
+                    stock_message += f"🧪 테스트 매수: {data['target_05x']:,.0f}원 ({data['drop_05x']:.2f}% 하락)\n"
                     stock_message += f"1차 매수 목표: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
                     stock_message += f"2차 매수 목표: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
                 else:
                     stock_message = f"📊 {ticker} - {name}\n"
                     stock_message += f"💰 투자금: {invest_str}\n\n"
+                    stock_message += f"🧪 테스트 매수: ${data['target_05x']:,.2f} ({data['drop_05x']:.2f}% 하락)\n"
                     stock_message += f"1차 매수 목표: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)\n"
                     stock_message += f"2차 매수 목표: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)\n"
             
@@ -196,6 +198,7 @@ def send_daily_alerts(analysis_results):
         message += f"\n━━━━━━━━━━━━━━━━━━\n"
         message += f"✅ 총 {sent_charts}개 종목 차트 전송\n\n"
         message += "💡 매수 시점:\n"
+        message += "  • 🧪 테스트: 표준편차 0.5배 하락 시\n"
         message += "  • 1차: 표준편차 1배 하락 시\n"
         message += "  • 2차: 표준편차 2배 하락 시\n\n"
         message += "행운을 빕니다! 🍀"
