@@ -12,8 +12,8 @@ SCHEDULE_CONFIG = {
     'realtime_enabled': True,
     
     # 운영 시간 (장이 열려있는 시간만 체크)
-    'market_open_time': '09:30',
-    'market_close_time': '16:00',
+    'market_open_time': '09:00',
+    'market_close_time': '15:30',
     
     # 요일 (0=월요일, 6=일요일)
     'trading_days': [0, 1, 2, 3, 4],  # 월-금
