@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-매일 일봉 데이터 자동 업데이트 + 놓친 알림 요약
-매일 오전 8:00에 실행
+매일 자동 스케줄러
+- 08:00: 일봉 데이터 업데이트 + 놓친 알림 요약
+- 08:50: 오늘의 매수 전략 분석 (월-금)
 """
 import schedule
 import time
 from datetime import datetime
 from data_collector import DataCollector
 from missed_alerts import send_missed_alerts_summary
+from daily_analysis import send_daily_alerts
 
 
-def update_job():
-    """일봉 데이터 업데이트 + 놓친 알림 전송"""
+def morning_update_job():
+    """일봉 데이터 업데이트 + 놓친 알림 전송 (매일 08:00)"""
     print("\n" + "="*70)
-    print(f"⏰ 일일 업데이트 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"⏰ 아침 업데이트 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70)
     
     # 1. 일봉 데이터 업데이트
@@ -38,25 +40,48 @@ def update_job():
         traceback.print_exc()
     
     print("\n" + "="*70)
-    print("✅ 일일 업데이트 완료!")
+    print("✅ 아침 업데이트 완료!")
+    print("="*70)
+
+
+def daily_analysis_job():
+    """오늘의 매수 전략 분석 (월-금 08:50)"""
+    print("\n" + "="*70)
+    print(f"📊 오늘의 매수 전략 분석 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*70)
+    
+    try:
+        send_daily_alerts()
+    except Exception as e:
+        print(f"❌ 일일 분석 실패: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    print("\n" + "="*70)
+    print("✅ 일일 분석 완료!")
     print("="*70)
 
 
 def main():
     """스케줄러 메인"""
     print("\n" + "="*70)
-    print("📅 일일 데이터 업데이트 스케줄러 시작")
+    print("📅 일일 스케줄러 시작")
     print("="*70)
-    print("⏰ 스케줄: 매일 오전 08:00")
+    print("⏰ 스케줄:")
+    print("   - 매일 08:00: 일봉 업데이트 + 놓친 알림")
+    print("   - 매일 08:50: 매수 전략 분석 (월-금)")
     print("💡 Ctrl+C로 종료")
     print("="*70 + "\n")
     
-    # 스케줄 등록: 매일 오전 8시
-    schedule.every().day.at("08:00").do(update_job)
+    # 스케줄 등록
+    schedule.every().day.at("08:00").do(morning_update_job)
+    schedule.every().day.at("08:50").do(daily_analysis_job)
     
     # 시작 시 한 번 실행 (어제 데이터 확인)
     print("🔍 시작 시 데이터 확인...")
-    update_job()
+    morning_update_job()
+    
+    print("\n✅ 스케줄 등록 완료! 다음 실행 대기 중...")
     
     # 무한 루프
     while True:
@@ -65,12 +90,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\n⏸️  스케줄러 종료")
-    except Exception as e:
-        print(f"\n❌ 오류: {e}")
-        import traceback
-        traceback.print_exc()
-
+    main()
