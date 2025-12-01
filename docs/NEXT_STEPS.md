@@ -59,7 +59,7 @@ git push -u origin main
 
 ```bash
 # SSH 접속
-ssh -p 2848 jjongz@192.168.1.136
+ssh -p 2121 jjongz@192.168.1.2
 
 # 프로젝트 디렉토리
 cd /volume1/docker
@@ -158,7 +158,7 @@ git push origin main
 ### NAS에서 업데이트
 
 ```bash
-ssh -p 2848 jjongz@192.168.1.136
+ssh -p 2121 jjongz@192.168.1.2
 cd /volume1/docker/stock-monitor
 
 # Pull
