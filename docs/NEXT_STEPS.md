@@ -84,8 +84,8 @@ python setup_secrets.py
 ```
 
 **입력할 정보:**
-- 텔레그램 Bot Token: `8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM`
-- 텔레그램 Chat ID: `6633793503`
+- 텔레그램 Bot Token: `8105************-3pM`
+- 텔레그램 Chat ID: `66***3503`
 - 기본 투자 금액: `1000000`
 
 ### 5️⃣ DB 초기화
@@ -126,12 +126,12 @@ python user_manager.py
 **예시:**
 ```
 이름: 아빠
-Chat ID: 6633793503
+Chat ID: 663****503
 투자금액: 1000000
 종목: TQQQ, SOXL, QLD
 
 이름: 와이프
-Chat ID: 987654321
+Chat ID: 98*****21
 투자금액: 500000
 종목: SPY, QQQ
 ```
