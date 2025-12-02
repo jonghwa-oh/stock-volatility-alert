@@ -406,10 +406,18 @@ class TelegramBotCommandHandler:
                         message = f"📊 {ticker} - {name}\n"
                     message += f"💰 투자금: {invest_str}\n"
                 
-                # 차트와 함께 전송
+                # 차트와 함께 전송 (async 방식)
                 try:
                     log_debug(f"   [{ticker}] 텔레그램 전송 중...")
-                    send_telegram_sync(self.bot_token, user['chat_id'], message, str(chart_path))
+                    
+                    # 차트 파일과 함께 메시지 전송
+                    with open(chart_path, 'rb') as photo:
+                        await update.get_bot().send_photo(
+                            chat_id=user['chat_id'],
+                            photo=photo,
+                            caption=message
+                        )
+                    
                     sent_count += 1
                     log_success(f"   ✅ [{ticker}] 차트 전송 완료")
                 except Exception as e:
