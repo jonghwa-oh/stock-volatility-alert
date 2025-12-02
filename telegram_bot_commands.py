@@ -15,7 +15,7 @@ from kis_api import KISApi
 import FinanceDataReader as fdr
 from datetime import datetime
 import traceback
-from log_utils import log, log_section, log_success, log_error, log_debug
+from log_utils import log, log_section, log_success, log_error, log_debug, log_warning
 from telegram_bot import send_telegram_sync
 
 
@@ -329,45 +329,75 @@ class TelegramBotCommandHandler:
                 await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
                 return
             
-            # 사용자 관심 종목 필터링
+            # 사용자 관심 종목 가져오기
             watchlist = self.db.get_user_watchlist_with_names(user['name'])
-            user_tickers = [stock['ticker'] for stock in watchlist]
             
-            # 사용자의 종목만 필터링
-            user_results = [r for r in analysis_results if r['ticker'] in user_tickers]
-            
-            if not user_results:
-                await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
+            if not watchlist:
+                await update.message.reply_text("⚠️ 관심 종목이 없습니다.")
                 return
             
-            # 차트와 함께 메시지 전송
-            for result in user_results:
-                message = f"""📊 {result['name']} ({result['ticker']})
-
-💰 현재가: {result['current_price_str']}
-
-🎯 매수 목표가:
-  🧪 테스트: {result['target_05x_str']} ({result['drop_05x']:.2f}% 하락)
-  1차 매수: {result['target_1x_str']} ({result['drop_1x']:.2f}% 하락)
-  2차 매수: {result['target_2x_str']} ({result['drop_2x']:.2f}% 하락)
-
-💵 투자금액: {result['investment_str']}
-📈 매수수량:
-  1차: {result['shares_1x']}주 (평단가 {result['avg_price_1x_str']})
-  2차: {result['shares_2x']}주 (평단가 {result['avg_price_2x_str']})"""
+            today = datetime.now().strftime('%Y-%m-%d')
+            sent_count = 0
+            
+            # 각 관심 종목별로 차트 전송
+            for stock in watchlist:
+                ticker = stock['ticker']
+                name = stock['name']
+                
+                # 분석 결과 가져오기 (analysis_results는 딕셔너리)
+                result = analysis_results.get(ticker)
+                
+                if not result:
+                    log_warning(f"  ⚠️  {ticker} 분석 결과 없음")
+                    continue
                 
                 # 차트 파일 경로
-                chart_file = result.get('chart_file')
+                chart_path = Path(result['chart_path'])
                 
-                # send_telegram_sync(bot_token, chat_id, message, photo_path)
-                if chart_file and Path(chart_file).exists():
-                    # 차트와 함께 전송
-                    send_telegram_sync(self.bot_token, user['chat_id'], message, chart_file)
+                if not chart_path.exists():
+                    log_warning(f"  ⚠️  {ticker} 차트 파일 없음: {chart_path}")
+                    continue
+                
+                # 통화 단위 결정
+                is_korean = ticker.isdigit()
+                invest_str = f"{int(user['investment_amount']):,}원"
+                
+                # 분석 데이터가 있으면 메시지 생성
+                if result.get('data'):
+                    data = result['data']
+                    
+                    if is_korean:
+                        message = f"📊 {name} ({ticker})\n"
+                        message += f"💰 투자금: {invest_str}\n\n"
+                        message += f"🧪 테스트 매수: {data['target_05x']:,.0f}원 ({data['drop_05x']:.2f}% 하락)\n"
+                        message += f"1차 매수 목표: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
+                        message += f"2차 매수 목표: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
+                    else:
+                        message = f"📊 {ticker} - {name}\n"
+                        message += f"💰 투자금: {invest_str}\n\n"
+                        message += f"🧪 테스트 매수: ${data['target_05x']:,.2f} ({data['drop_05x']:.2f}% 하락)\n"
+                        message += f"1차 매수 목표: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)\n"
+                        message += f"2차 매수 목표: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)\n"
                 else:
-                    # 차트 없이 텍스트만
-                    send_telegram_sync(self.bot_token, user['chat_id'], message)
+                    # data가 없으면 간단한 메시지
+                    if is_korean:
+                        message = f"📊 {name} ({ticker})\n"
+                    else:
+                        message = f"📊 {ticker} - {name}\n"
+                    message += f"💰 투자금: {invest_str}\n"
+                
+                # 차트와 함께 전송
+                try:
+                    send_telegram_sync(self.bot_token, user['chat_id'], message, str(chart_path))
+                    sent_count += 1
+                    log_success(f"  ✅ {ticker} 차트 전송 완료")
+                except Exception as e:
+                    log_error(f"  ❌ {ticker} 전송 실패: {e}")
             
-            await update.message.reply_text("✅ 분석 완료! 차트를 확인하세요.")
+            if sent_count > 0:
+                await update.message.reply_text(f"✅ 분석 완료! {sent_count}개 종목 차트를 전송했습니다.")
+            else:
+                await update.message.reply_text("⚠️ 전송할 차트가 없습니다.")
             
         except Exception as e:
             error_msg = f"❌ 분석 실패: {str(e)}"
