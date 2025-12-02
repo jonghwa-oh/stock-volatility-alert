@@ -115,6 +115,23 @@ class StockDatabase:
             )
         ''')
         
+        # country 컬럼 추가 (기존 테이블 업데이트)
+        try:
+            cursor.execute("ALTER TABLE user_watchlist ADD COLUMN country TEXT DEFAULT 'US'")
+            # 기존 데이터에 country 값 설정 (숫자면 KR, 알파벳이면 US)
+            cursor.execute('''
+                UPDATE user_watchlist 
+                SET country = CASE 
+                    WHEN ticker GLOB '[0-9]*' THEN 'KR' 
+                    ELSE 'US' 
+                END
+                WHERE country IS NULL OR country = ''
+            ''')
+            conn.commit()
+        except sqlite3.OperationalError:
+            # 이미 컬럼이 존재하면 무시
+            pass
+        
         # 설정 테이블 (봇 토큰, 기본값 등)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS settings (
