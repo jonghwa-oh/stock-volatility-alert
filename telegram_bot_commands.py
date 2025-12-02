@@ -662,12 +662,12 @@ class TelegramBotCommandHandler:
                 status_text = "비활성화"
                 action_text = "켜려면 /alarm_on 을 입력하세요."
             
-            message = f"{status_icon} 알림 상태: **{status_text}**\n\n"
+            message = f"{status_icon} 알림 상태: {status_text}\n\n"
             message += f"📊 관심 종목: {watchlist_count}개\n"
             message += f"💰 투자금액: {investment_amount:,}원\n\n"
             message += action_text
             
-            await update.message.reply_text(message, parse_mode='Markdown')
+            await update.message.reply_text(message)
             log_success(f"/alarm_status 명령 완료 - {user['name']}")
             
         except Exception as e:
