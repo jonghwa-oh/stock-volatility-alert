@@ -100,47 +100,62 @@ class TelegramBotCommandHandler:
         """
         /list - 내 관심 종목 목록
         """
-        log(f"📥 /list 명령 수신 - Chat ID: {update.effective_chat.id}")
-        chat_id = str(update.effective_chat.id)
-        
-        # 사용자 찾기
-        users = self.db.get_all_users()
-        user = next((u for u in users if u['chat_id'] == chat_id), None)
-        
-        if not user:
-            await update.message.reply_text(
-                "❌ 등록되지 않은 사용자입니다.\n"
-                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
-                parse_mode='Markdown'
-            )
-            return
-        
-        # 관심 종목 가져오기
-        watchlist = self.db.get_user_watchlist_with_names(user['name'])
-        
-        if not watchlist:
-            await update.message.reply_text("📝 관심 종목이 없습니다.\n\n/add TICKER 로 종목을 추가하세요!")
-            return
-        
-        message = f"📊 {user['name']}님의 관심 종목\n\n"
-        message += f"투자금액: {int(user['investment_amount']):,}원\n\n"
-        message += "━━━━━━━━━━━━━━━━━━\n\n"
-        
-        for idx, stock in enumerate(watchlist, 1):
-            ticker = stock['ticker']
-            name = stock['name']
-            country = stock['country']
-            flag = '🇰🇷' if country == 'KR' else '🇺🇸'
+        try:
+            log(f"📥 /list 명령 수신 - Chat ID: {update.effective_chat.id}")
+            chat_id = str(update.effective_chat.id)
             
-            if ticker.isdigit():
-                message += f"{idx}. {flag} {name} ({ticker})\n"
-            else:
-                message += f"{idx}. {flag} {ticker} - {name}\n"
-        
-        message += f"\n━━━━━━━━━━━━━━━━━━\n"
-        message += f"총 {len(watchlist)}개 종목"
-        
-        await update.message.reply_text(message)
+            # 사용자 찾기
+            users = self.db.get_all_users()
+            log_debug(f"전체 사용자 수: {len(users)}")
+            
+            user = next((u for u in users if u['chat_id'] == chat_id), None)
+            
+            if not user:
+                log_error(f"미등록 사용자: {chat_id}")
+                await update.message.reply_text(
+                    "❌ 등록되지 않은 사용자입니다.\n"
+                    f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            log_debug(f"사용자 찾음: {user['name']}")
+            
+            # 관심 종목 가져오기
+            watchlist = self.db.get_user_watchlist_with_names(user['name'])
+            log_debug(f"관심 종목 수: {len(watchlist)}")
+            
+            if not watchlist:
+                await update.message.reply_text("📝 관심 종목이 없습니다.\n\n/add TICKER 로 종목을 추가하세요!")
+                return
+            
+            message = f"📊 {user['name']}님의 관심 종목\n\n"
+            message += f"투자금액: {int(user['investment_amount']):,}원\n\n"
+            message += "━━━━━━━━━━━━━━━━━━\n\n"
+            
+            for idx, stock in enumerate(watchlist, 1):
+                ticker = stock['ticker']
+                name = stock['name']
+                country = stock['country']
+                flag = '🇰🇷' if country == 'KR' else '🇺🇸'
+                
+                if ticker.isdigit():
+                    message += f"{idx}. {flag} {name} ({ticker})\n"
+                else:
+                    message += f"{idx}. {flag} {ticker} - {name}\n"
+            
+            message += f"\n━━━━━━━━━━━━━━━━━━\n"
+            message += f"총 {len(watchlist)}개 종목"
+            
+            log_debug(f"메시지 전송: {len(message)} bytes")
+            await update.message.reply_text(message)
+            log_success(f"/list 명령 완료 - {user['name']}")
+            
+        except Exception as e:
+            log_error(f"/list 명령 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            await update.message.reply_text(f"❌ 오류 발생: {str(e)}")
     
     async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -314,9 +329,6 @@ class TelegramBotCommandHandler:
                 await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
                 return
             
-            # 명령 실행한 사용자에게만 알림 전송
-            from telegram_bot import send_telegram_message_with_chart
-            
             # 사용자 관심 종목 필터링
             watchlist = self.db.get_user_watchlist_with_names(user['name'])
             user_tickers = [stock['ticker'] for stock in watchlist]
@@ -330,8 +342,7 @@ class TelegramBotCommandHandler:
             
             # 차트와 함께 메시지 전송
             for result in user_results:
-                message = f"""
-📊 {result['name']} ({result['ticker']})
+                message = f"""📊 {result['name']} ({result['ticker']})
 
 💰 현재가: {result['current_price_str']}
 
@@ -343,22 +354,18 @@ class TelegramBotCommandHandler:
 💵 투자금액: {result['investment_str']}
 📈 매수수량:
   1차: {result['shares_1x']}주 (평단가 {result['avg_price_1x_str']})
-  2차: {result['shares_2x']}주 (평단가 {result['avg_price_2x_str']})
-"""
+  2차: {result['shares_2x']}주 (평단가 {result['avg_price_2x_str']})"""
                 
                 # 차트 파일 경로
                 chart_file = result.get('chart_file')
                 
+                # send_telegram_sync(bot_token, chat_id, message, photo_path)
                 if chart_file and Path(chart_file).exists():
                     # 차트와 함께 전송
-                    send_telegram_message_with_chart(
-                        user['chat_id'],
-                        message,
-                        chart_file
-                    )
+                    send_telegram_sync(self.bot_token, user['chat_id'], message, chart_file)
                 else:
                     # 차트 없이 텍스트만
-                    send_telegram_sync(user['chat_id'], message)
+                    send_telegram_sync(self.bot_token, user['chat_id'], message)
             
             await update.message.reply_text("✅ 분석 완료! 차트를 확인하세요.")
             
