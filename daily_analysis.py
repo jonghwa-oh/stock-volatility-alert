@@ -107,7 +107,14 @@ def send_daily_alerts(analysis_results):
     users = db.get_all_users()
     
     for user in users:
+        # 사용자 활성화 체크
         if not user['enabled']:
+            continue
+        
+        # 알림 활성화 체크
+        notification_enabled = user.get('notification_enabled', 1)
+        if not notification_enabled:
+            print(f"  ⏸️  {user['name']} - 알림 비활성화 상태 (건너뜀)")
             continue
         
         print(f"\n👤 {user['name']} 님에게 알림 전송 중...")

@@ -55,7 +55,10 @@ class TelegramBotCommandHandler:
         message += "/add TICKER - 종목 추가\n"
         message += "/remove TICKER - 종목 삭제\n"
         message += "/morning - 아침 알림 받기\n"
-        message += "/status - 실시간 현재가 확인"
+        message += "/status - 실시간 현재가 확인\n"
+        message += "/alarm_on - 알림 켜기\n"
+        message += "/alarm_off - 알림 끄기\n"
+        message += "/alarm_status - 알림 상태"
         
         await update.message.reply_text(message, parse_mode='Markdown')
     
@@ -79,11 +82,17 @@ class TelegramBotCommandHandler:
         message += "   예) /status\n"
         message += "   예) /status TQQQ\n\n"
         
+        message += "🔔 알림 설정:\n"
+        message += "/alarm_on - 알림 켜기\n"
+        message += "/alarm_off - 알림 끄기\n"
+        message += "/alarm_status - 알림 상태 확인\n\n"
+        
         message += "💡 Tips:\n"
         message += "• 한국 주식: 티커 번호 (예: 122630)\n"
         message += "• 미국 주식: 티커 심볼 (예: TQQQ)\n"
         message += "• 실시간 알림은 09:00~24:00에만 전송됩니다.\n"
-        message += "• 밤 사이 놓친 알림은 08:00에 요약 전송됩니다."
+        message += "• 밤 사이 놓친 알림은 08:00에 요약 전송됩니다.\n"
+        message += "• 잠잘 때는 /alarm_off로 알림을 끌 수 있습니다."
         
         await update.message.reply_text(message)
     
@@ -457,6 +466,127 @@ class TelegramBotCommandHandler:
         
         await update.message.reply_text(message)
     
+    async def alarm_on_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /alarm_on - 알림 켜기
+        """
+        log(f"📥 /alarm_on 명령 수신 - Chat ID: {update.effective_chat.id}")
+        chat_id = str(update.effective_chat.id)
+        
+        # 사용자 찾기
+        users = self.db.get_all_users()
+        user = next((u for u in users if u['chat_id'] == chat_id), None)
+        
+        if not user:
+            await update.message.reply_text(
+                "❌ 등록되지 않은 사용자입니다.\n"
+                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # 알림 활성화
+        conn = self.db.connect()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE users 
+            SET notification_enabled = 1 
+            WHERE id = ?
+        ''', (user['id'],))
+        conn.commit()
+        self.db.close()
+        
+        await update.message.reply_text(
+            "🔔 알림이 활성화되었습니다!\n\n"
+            "실시간 매수 타이밍 알림을 받습니다."
+        )
+        log_success(f"사용자 {user['name']} 알림 활성화")
+    
+    async def alarm_off_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /alarm_off - 알림 끄기
+        """
+        log(f"📥 /alarm_off 명령 수신 - Chat ID: {update.effective_chat.id}")
+        chat_id = str(update.effective_chat.id)
+        
+        # 사용자 찾기
+        users = self.db.get_all_users()
+        user = next((u for u in users if u['chat_id'] == chat_id), None)
+        
+        if not user:
+            await update.message.reply_text(
+                "❌ 등록되지 않은 사용자입니다.\n"
+                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # 알림 비활성화
+        conn = self.db.connect()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE users 
+            SET notification_enabled = 0 
+            WHERE id = ?
+        ''', (user['id'],))
+        conn.commit()
+        self.db.close()
+        
+        await update.message.reply_text(
+            "🔕 알림이 비활성화되었습니다.\n\n"
+            "실시간 매수 타이밍 알림을 받지 않습니다.\n"
+            "다시 켜려면 /alarm_on 을 입력하세요."
+        )
+        log_success(f"사용자 {user['name']} 알림 비활성화")
+    
+    async def alarm_status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /alarm_status - 알림 상태 확인
+        """
+        log(f"📥 /alarm_status 명령 수신 - Chat ID: {update.effective_chat.id}")
+        chat_id = str(update.effective_chat.id)
+        
+        # 사용자 찾기
+        users = self.db.get_all_users()
+        user = next((u for u in users if u['chat_id'] == chat_id), None)
+        
+        if not user:
+            await update.message.reply_text(
+                "❌ 등록되지 않은 사용자입니다.\n"
+                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # 알림 상태 확인
+        conn = self.db.connect()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT notification_enabled 
+            FROM users 
+            WHERE id = ?
+        ''', (user['id'],))
+        result = cursor.fetchone()
+        self.db.close()
+        
+        notification_enabled = result[0] if result else 1
+        
+        if notification_enabled:
+            status_icon = "🔔"
+            status_text = "활성화"
+            action_text = "끄려면 /alarm_off 를 입력하세요."
+        else:
+            status_icon = "🔕"
+            status_text = "비활성화"
+            action_text = "켜려면 /alarm_on 을 입력하세요."
+        
+        message = f"{status_icon} 알림 상태: **{status_text}**\n\n"
+        message += f"📊 관심 종목: {len(self.db.get_user_watchlist_with_names(user['name']))}개\n"
+        message += f"💰 투자금액: {int(user['investment_amount']):,}원\n\n"
+        message += action_text
+        
+        await update.message.reply_text(message, parse_mode='Markdown')
+    
     def run(self):
         """봇 실행"""
         log_section("🤖 텔레그램 봇 커맨드 핸들러 시작")
@@ -475,6 +605,9 @@ class TelegramBotCommandHandler:
         application.add_handler(CommandHandler("remove", self.remove_command))
         application.add_handler(CommandHandler("morning", self.morning_command))
         application.add_handler(CommandHandler("status", self.status_command))
+        application.add_handler(CommandHandler("alarm_on", self.alarm_on_command))
+        application.add_handler(CommandHandler("alarm_off", self.alarm_off_command))
+        application.add_handler(CommandHandler("alarm_status", self.alarm_status_command))
         
         log("")
         log_success("커맨드 핸들러 등록 완료:")
@@ -485,6 +618,9 @@ class TelegramBotCommandHandler:
         log("   - /remove: 종목 삭제")
         log("   - /morning: 아침 알림")
         log("   - /status: 현재가 확인")
+        log("   - /alarm_on: 알림 켜기")
+        log("   - /alarm_off: 알림 끄기")
+        log("   - /alarm_status: 알림 상태")
         
         log("")
         log("🚀 봇 시작... (Ctrl+C로 종료)")

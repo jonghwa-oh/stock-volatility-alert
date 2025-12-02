@@ -89,9 +89,17 @@ class StockDatabase:
                 chat_id TEXT NOT NULL,
                 investment_amount REAL DEFAULT 1000000,
                 enabled BOOLEAN DEFAULT 1,
+                notification_enabled BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # notification_enabled 컬럼 추가 (기존 테이블 업데이트)
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN notification_enabled BOOLEAN DEFAULT 1")
+        except sqlite3.OperationalError:
+            # 이미 컬럼이 존재하면 무시
+            pass
         
         # 사용자별 관심 종목 테이블
         cursor.execute('''
