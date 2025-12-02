@@ -134,8 +134,8 @@ nano config.py
 다음 내용 확인 및 수정:
 ```python
 TELEGRAM_CONFIG = {
-    'BOT_TOKEN': '8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM',
-    'CHAT_ID': '6633793503',
+    'BOT_TOKEN': 'YOUR_BOT_TOKEN_HERE',
+    'CHAT_ID': 'YOUR_CHAT_ID_HERE',
 }
 ```
 

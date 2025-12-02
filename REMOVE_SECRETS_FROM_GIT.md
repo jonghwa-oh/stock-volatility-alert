@@ -27,9 +27,9 @@ cd /Users/jjongz/PycharmProjects/finacneFee
 
 # secrets.txt 파일 생성
 cat > secrets.txt <<EOF
-8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM
-6633793503
-798920
+YOUR_BOT_TOKEN_HERE
+YOUR_CHAT_ID_HERE
+YOUR_API_KEY_HERE
 EOF
 ```
 
@@ -76,7 +76,7 @@ git filter-branch --force --index-filter \
 ```bash
 # Bot Token 치환
 git filter-branch --force --tree-filter \
-  'find . -type f -exec sed -i "" "s/8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM/[REDACTED_BOT_TOKEN]/g" {} \;' \
+  'find . -type f -exec sed -i "" "s/YOUR_OLD_BOT_TOKEN/[REDACTED_BOT_TOKEN]/g" {} \;' \
   HEAD
 ```
 
@@ -130,19 +130,20 @@ git push -u --force origin main
 
 ### 봇 토큰
 ```
-8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM
+YOUR_BOT_TOKEN_HERE
+예: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
 
 ### Chat ID
 ```
-6633793503
-798920
+YOUR_CHAT_ID_HERE
+예: 123456789
 ```
 
 ### KIS API 키 (코드에 노출된 경우)
 ```
-PS3dFQ9TYaOGhO3MBABLt9JtUTivW1ihOJrt
-qEtP1QwuheXZvouP/tjPPYMiyDRJ5S7YpWwFaCs+SIZQB7G5MlfVZ6+im/2u4xbbiamTQ0HXD4UFy3WT7242FKdHBLNVWzfHOhs8JLlBb3lGzuEuUMLsrf0rPYFFQXuMEfh7f1rr9oQAyYQXq70eJfJ5/ggn6kGEFqV7I3pRPzeBSTf6kQk=
+YOUR_KIS_APP_KEY_HERE
+YOUR_KIS_APP_SECRET_HERE
 ```
 
 ---
@@ -153,10 +154,10 @@ qEtP1QwuheXZvouP/tjPPYMiyDRJ5S7YpWwFaCs+SIZQB7G5MlfVZ6+im/2u4xbbiamTQ0HXD4UFy3WT
 
 ```bash
 # Bot Token 검색
-git log -S"8105040252" --all
+git log -S"YOUR_BOT_TOKEN" --all
 
 # Chat ID 검색
-git log -S"6633793503" --all
+git log -S"YOUR_CHAT_ID" --all
 ```
 
 **출력이 없으면 성공!**
@@ -164,7 +165,7 @@ git log -S"6633793503" --all
 ### 2. GitHub에서 검색
 
 1. GitHub 저장소 접속
-2. 우측 상단 검색창에 `8105040252` 입력
+2. 우측 상단 검색창에 민감한 정보 입력
 3. **"Code" 탭에서 검색**
 
 **결과가 없으면 성공!**
@@ -175,9 +176,8 @@ git log -S"6633793503" --all
 cd /Users/jjongz/PycharmProjects/finacneFee
 
 # 모든 파일에서 민감한 정보 검색
-grep -r "8105040252" .
-grep -r "6633793503" .
-grep -r "798920" .
+grep -r "YOUR_BOT_TOKEN" .
+grep -r "YOUR_CHAT_ID" .
 ```
 
 **출력이 없으면 성공!**
@@ -193,12 +193,19 @@ grep -r "798920" .
 cat > .git/hooks/pre-commit <<'EOF'
 #!/bin/bash
 
-# 민감한 정보 검사
-if git diff --cached | grep -E "8105[0-9]{6}|663[0-9]{7}"; then
-  echo "❌ 민감한 정보가 포함되어 있습니다!"
-  echo "   Commit을 중단합니다."
-  exit 1
-fi
+# 민감한 정보 검사 패턴
+SENSITIVE_PATTERNS=(
+  "[0-9]{10}:AA[A-Za-z0-9_-]{30,}"  # Telegram Bot Token
+  "PS[A-Za-z0-9]{30,}"                # KIS API Key
+)
+
+for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+  if git diff --cached | grep -E "$pattern"; then
+    echo "❌ 민감한 정보가 포함되어 있습니다!"
+    echo "   Commit을 중단합니다."
+    exit 1
+  fi
+done
 
 echo "✅ 민감한 정보 없음 - Commit 진행"
 EOF
@@ -226,7 +233,7 @@ EOF
 
 ```python
 # ❌ 나쁜 예
-BOT_TOKEN = "8105040252:AAH..."
+BOT_TOKEN = "1234567890:ABC..."
 
 # ✅ 좋은 예
 import os
