@@ -29,6 +29,7 @@ class TelegramBotCommandHandler:
         """
         /start - 봇 시작 및 환영 메시지
         """
+        print(f"📥 /start 명령 수신 - User: {update.effective_user.first_name}, Chat ID: {update.effective_chat.id}")
         user = update.effective_user
         chat_id = update.effective_chat.id
         
@@ -87,6 +88,7 @@ class TelegramBotCommandHandler:
         """
         /list - 내 관심 종목 목록
         """
+        print(f"📥 /list 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
         # 사용자 찾기
@@ -275,6 +277,7 @@ class TelegramBotCommandHandler:
         """
         /morning - 아침 알림 수동 받기
         """
+        print(f"📥 /morning 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
         # 사용자 찾기
@@ -413,9 +416,12 @@ class TelegramBotCommandHandler:
         print("\n" + "="*70)
         print("🤖 텔레그램 봇 커맨드 핸들러 시작")
         print("="*70)
+        print(f"✅ Bot Token: {self.bot_token[:20]}...{self.bot_token[-10:]}")
         
         # Application 생성
+        print("🔧 Telegram Application 생성 중...")
         application = Application.builder().token(self.bot_token).build()
+        print("✅ Application 생성 완료!")
         
         # 커맨드 핸들러 등록
         application.add_handler(CommandHandler("start", self.start_command))
@@ -439,7 +445,12 @@ class TelegramBotCommandHandler:
         print("="*70 + "\n")
         
         # 봇 실행
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        print("🔄 Polling 시작...")
+        try:
+            application.run_polling(allowed_updates=Update.ALL_TYPES)
+        except Exception as e:
+            print(f"❌ 봇 실행 오류: {e}")
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

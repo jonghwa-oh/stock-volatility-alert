@@ -2,7 +2,7 @@
 하이브리드 실시간 매수 알림 시스템
 - 한국 주식: WebSocket 실시간 모니터링
 - 미국 주식: 분봉 데이터 모니터링
-- 알림 시간: 09:00~24:00
+- 알림 시간: 09:00~24:00 (DEBUG_MODE=true로 24시간 활성화 가능)
 """
 import asyncio
 from datetime import datetime, time
@@ -13,6 +13,7 @@ from volatility_analysis import analyze_daily_volatility
 from telegram_bot import send_telegram_sync
 from config import load_config
 import FinanceDataReader as fdr
+import os
 
 
 class HybridRealtimeMonitor:
@@ -30,12 +31,21 @@ class HybridRealtimeMonitor:
         # 알림 전송 이력 (중복 방지)
         self.alert_history = {}  # {ticker: {'1x': timestamp, '2x': timestamp}}
         
+        # 디버그 모드 (시간 제한 없음)
+        self.debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+        
         # 알림 시간 설정
         self.alert_start_time = time(8, 0)   # 08:00
         self.alert_end_time = time(23, 59)   # 24:00
+        
+        if self.debug_mode:
+            print("🔧 DEBUG MODE: 24시간 알림 활성화")
     
     def _is_alert_time(self) -> bool:
-        """알림 가능 시간 확인 (08:00~24:00)"""
+        """알림 가능 시간 확인 (08:00~24:00, DEBUG_MODE시 항상 true)"""
+        if self.debug_mode:
+            return True
+        
         now = datetime.now().time()
         return self.alert_start_time <= now <= self.alert_end_time
     
@@ -318,7 +328,8 @@ class HybridRealtimeMonitor:
         while True:
             # 알림 시간 체크
             if not self._is_alert_time():
-                print(f"⏸️  알림 시간 외 (09:00~24:00만 알림)")
+                now = datetime.now().strftime('%H:%M:%S')
+                print(f"⏸️  [{now}] 알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
                 await asyncio.sleep(60)
                 continue
             
@@ -414,13 +425,17 @@ if __name__ == "__main__":
     print("\n" + "="*70)
     print("🚀 하이브리드 실시간 매수 알림 시스템")
     print("="*70)
-    print("""
+    
+    debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+    time_info = "24시간 (DEBUG_MODE)" if debug_mode else "08:00~24:00"
+    
+    print(f"""
 🇰🇷 한국 주식: WebSocket 실시간 모니터링
 🇺🇸 미국 주식: 1분 간격 폴링 모니터링
-⏰ 알림 시간: 09:00~24:00
+⏰ 알림 시간: {time_info}
 
 실시간으로 가격을 모니터링하여
-1-sigma, 2-sigma 매수 타이밍을 즉시 알려드립니다!
+0.5-sigma, 1-sigma, 2-sigma 매수 타이밍을 즉시 알려드립니다!
 """)
     
     # 실행

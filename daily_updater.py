@@ -74,18 +74,28 @@ def main():
     print("="*70 + "\n")
     
     # 스케줄 등록
+    print("🔧 스케줄 등록 중...")
     schedule.every().day.at("08:00").do(morning_update_job)
     schedule.every().day.at("08:50").do(daily_analysis_job)
+    print("✅ 스케줄 등록 완료:")
+    print(f"   - 다음 08:00 실행: {schedule.next_run()}")
     
     # 시작 시 한 번 실행 (어제 데이터 확인)
-    print("🔍 시작 시 데이터 확인...")
+    print("\n🔍 시작 시 데이터 확인...")
     morning_update_job()
     
     print("\n✅ 스케줄 등록 완료! 다음 실행 대기 중...")
     
     # 무한 루프
+    loop_count = 0
     while True:
         schedule.run_pending()
+        loop_count += 1
+        
+        # 10분마다 상태 로그
+        if loop_count % 10 == 0:
+            print(f"⏰ [{datetime.now().strftime('%H:%M:%S')}] 스케줄 대기 중... 다음 실행: {schedule.next_run()}")
+        
         time.sleep(60)  # 1분마다 체크
 
 
