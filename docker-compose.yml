@@ -21,7 +21,7 @@ services:
       - TZ=Asia/Seoul
       - PYTHONUNBUFFERED=1
       # 디버그 모드: true로 설정시 24시간 알림 활성화
-      - DEBUG_MODE=${DEBUG_MODE:-false}
+      - DEBUG_MODE=${DEBUG_MODE:-true}
     
     # 로그 제한
     logging:
