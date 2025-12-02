@@ -307,56 +307,76 @@ class TelegramBotCommandHandler:
         log(f"📥 /morning 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
-        # 사용자 찾기
-        users = self.db.get_all_users()
-        user = next((u for u in users if u['chat_id'] == chat_id), None)
-        
-        if not user:
-            await update.message.reply_text(
-                "❌ 등록되지 않은 사용자입니다.\n"
-                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
-                parse_mode='Markdown'
-            )
-            return
-        
-        await update.message.reply_text("📊 분석 중... 잠시만 기다려주세요!")
-        
         try:
+            # 사용자 찾기
+            log_debug("1️⃣ 사용자 확인 중...")
+            users = self.db.get_all_users()
+            user = next((u for u in users if u['chat_id'] == chat_id), None)
+            
+            if not user:
+                log_error(f"등록되지 않은 사용자: {chat_id}")
+                await update.message.reply_text(
+                    "❌ 등록되지 않은 사용자입니다.\n"
+                    f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            log_success(f"✅ 사용자 확인: {user['name']}")
+            await update.message.reply_text("📊 분석 중... 잠시만 기다려주세요!")
+            
             # 분석 실행
+            log_debug("2️⃣ 분석 실행 중...")
             analysis_results = analyze_and_generate_charts()
             
             if not analysis_results:
-                await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
+                log_error("분석 결과가 없습니다.")
+                await update.message.reply_text("⚠️ 분석 결과가 없습니다.\n\nDB에 일봉 데이터가 있는지 확인하세요.")
                 return
             
+            log_success(f"✅ 분석 완료: {len(analysis_results)}개 종목")
+            
             # 사용자 관심 종목 가져오기
+            log_debug("3️⃣ 관심 종목 조회 중...")
             watchlist = self.db.get_user_watchlist_with_names(user['name'])
             
             if not watchlist:
-                await update.message.reply_text("⚠️ 관심 종목이 없습니다.")
+                log_error(f"{user['name']} 관심 종목이 없습니다.")
+                await update.message.reply_text("⚠️ 관심 종목이 없습니다.\n\n/add TICKER 로 종목을 추가하세요.")
                 return
+            
+            log_success(f"✅ 관심 종목: {len(watchlist)}개")
             
             today = datetime.now().strftime('%Y-%m-%d')
             sent_count = 0
+            failed_tickers = []
             
             # 각 관심 종목별로 차트 전송
+            log_debug("4️⃣ 차트 전송 시작...")
             for stock in watchlist:
                 ticker = stock['ticker']
                 name = stock['name']
+                
+                log_debug(f"   [{ticker}] 처리 중...")
                 
                 # 분석 결과 가져오기 (analysis_results는 딕셔너리)
                 result = analysis_results.get(ticker)
                 
                 if not result:
-                    log_warning(f"  ⚠️  {ticker} 분석 결과 없음")
+                    log_warning(f"   ⚠️  [{ticker}] 분석 결과 없음")
+                    failed_tickers.append(f"{ticker} (분석 결과 없음)")
                     continue
                 
                 # 차트 파일 경로
                 chart_path = Path(result['chart_path'])
+                log_debug(f"   [{ticker}] 차트 경로: {chart_path}")
                 
                 if not chart_path.exists():
-                    log_warning(f"  ⚠️  {ticker} 차트 파일 없음: {chart_path}")
+                    log_warning(f"   ⚠️  [{ticker}] 차트 파일 없음: {chart_path}")
+                    failed_tickers.append(f"{ticker} (차트 파일 없음)")
                     continue
+                
+                log_debug(f"   [{ticker}] 차트 존재 확인 ✓")
                 
                 # 통화 단위 결정
                 is_korean = ticker.isdigit()
@@ -388,21 +408,40 @@ class TelegramBotCommandHandler:
                 
                 # 차트와 함께 전송
                 try:
+                    log_debug(f"   [{ticker}] 텔레그램 전송 중...")
                     send_telegram_sync(self.bot_token, user['chat_id'], message, str(chart_path))
                     sent_count += 1
-                    log_success(f"  ✅ {ticker} 차트 전송 완료")
+                    log_success(f"   ✅ [{ticker}] 차트 전송 완료")
                 except Exception as e:
-                    log_error(f"  ❌ {ticker} 전송 실패: {e}")
+                    log_error(f"   ❌ [{ticker}] 전송 실패: {e}")
+                    failed_tickers.append(f"{ticker} (전송 실패: {str(e)})")
+                    import traceback
+                    traceback.print_exc()
             
+            # 결과 메시지
             if sent_count > 0:
-                await update.message.reply_text(f"✅ 분석 완료! {sent_count}개 종목 차트를 전송했습니다.")
+                result_msg = f"✅ 분석 완료! {sent_count}개 종목 차트를 전송했습니다."
+                if failed_tickers:
+                    result_msg += f"\n\n⚠️ 전송 실패: {len(failed_tickers)}개\n"
+                    for failed in failed_tickers:
+                        result_msg += f"• {failed}\n"
+                await update.message.reply_text(result_msg)
+                log_success(f"✅ /morning 완료: {sent_count}개 전송, {len(failed_tickers)}개 실패")
             else:
-                await update.message.reply_text("⚠️ 전송할 차트가 없습니다.")
+                error_msg = "⚠️ 전송할 차트가 없습니다.\n\n"
+                error_msg += f"총 {len(watchlist)}개 관심 종목 중:\n"
+                for failed in failed_tickers:
+                    error_msg += f"• {failed}\n"
+                await update.message.reply_text(error_msg)
+                log_error(f"❌ /morning 실패: 전송 가능한 차트 없음")
             
         except Exception as e:
-            error_msg = f"❌ 분석 실패: {str(e)}"
+            error_msg = f"❌ 분석 실패: {str(e)}\n\n"
+            error_msg += "로그를 확인하세요:\n"
+            error_msg += "sudo docker-compose logs stock-monitor --tail=50"
             await update.message.reply_text(error_msg)
-            log_error(f"분석 실패: {e}")
+            log_error(f"❌ /morning 실패: {e}")
+            import traceback
             traceback.print_exc()
     
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -580,49 +619,54 @@ class TelegramBotCommandHandler:
         """
         /alarm_status - 알림 상태 확인
         """
-        log(f"📥 /alarm_status 명령 수신 - Chat ID: {update.effective_chat.id}")
-        chat_id = str(update.effective_chat.id)
-        
-        # 사용자 찾기
-        users = self.db.get_all_users()
-        user = next((u for u in users if u['chat_id'] == chat_id), None)
-        
-        if not user:
-            await update.message.reply_text(
-                "❌ 등록되지 않은 사용자입니다.\n"
-                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
-                parse_mode='Markdown'
-            )
-            return
-        
-        # 알림 상태 확인
-        conn = self.db.connect()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT notification_enabled 
-            FROM users 
-            WHERE id = ?
-        ''', (user['id'],))
-        result = cursor.fetchone()
-        self.db.close()
-        
-        notification_enabled = result[0] if result else 1
-        
-        if notification_enabled:
-            status_icon = "🔔"
-            status_text = "활성화"
-            action_text = "끄려면 /alarm_off 를 입력하세요."
-        else:
-            status_icon = "🔕"
-            status_text = "비활성화"
-            action_text = "켜려면 /alarm_on 을 입력하세요."
-        
-        message = f"{status_icon} 알림 상태: **{status_text}**\n\n"
-        message += f"📊 관심 종목: {len(self.db.get_user_watchlist_with_names(user['name']))}개\n"
-        message += f"💰 투자금액: {int(user['investment_amount']):,}원\n\n"
-        message += action_text
-        
-        await update.message.reply_text(message, parse_mode='Markdown')
+        try:
+            log(f"📥 /alarm_status 명령 수신 - Chat ID: {update.effective_chat.id}")
+            chat_id = str(update.effective_chat.id)
+            
+            # 사용자 찾기
+            users = self.db.get_all_users()
+            user = next((u for u in users if u['chat_id'] == chat_id), None)
+            
+            if not user:
+                await update.message.reply_text(
+                    "❌ 등록되지 않은 사용자입니다.\n"
+                    f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            log_debug(f"사용자 찾음: {user['name']}")
+            
+            # 알림 상태 확인 (DB 닫기 전에 모든 정보 가져오기)
+            notification_enabled = user.get('notification_enabled', 1)
+            watchlist = self.db.get_user_watchlist_with_names(user['name'])
+            watchlist_count = len(watchlist)
+            investment_amount = int(user['investment_amount'])
+            
+            log_debug(f"알림 상태: {notification_enabled}, 관심 종목: {watchlist_count}개")
+            
+            if notification_enabled:
+                status_icon = "🔔"
+                status_text = "활성화"
+                action_text = "끄려면 /alarm_off 를 입력하세요."
+            else:
+                status_icon = "🔕"
+                status_text = "비활성화"
+                action_text = "켜려면 /alarm_on 을 입력하세요."
+            
+            message = f"{status_icon} 알림 상태: **{status_text}**\n\n"
+            message += f"📊 관심 종목: {watchlist_count}개\n"
+            message += f"💰 투자금액: {investment_amount:,}원\n\n"
+            message += action_text
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+            log_success(f"/alarm_status 명령 완료 - {user['name']}")
+            
+        except Exception as e:
+            log_error(f"/alarm_status 명령 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            await update.message.reply_text(f"❌ 오류 발생: {str(e)}")
     
     def run(self):
         """봇 실행"""
