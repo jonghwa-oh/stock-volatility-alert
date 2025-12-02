@@ -9,6 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     git \
     sqlite3 \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 패키지 설치

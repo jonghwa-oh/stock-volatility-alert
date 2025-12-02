@@ -54,8 +54,8 @@ log "   PID: $UPDATER_PID"
 log "   로그: /tmp/daily_updater.log"
 sleep 2
 
-# 프로세스 확인
-if ps -p $UPDATER_PID > /dev/null; then
+# 프로세스 확인 (kill -0은 ps 명령어가 없어도 작동)
+if kill -0 $UPDATER_PID 2>/dev/null; then
     log "✅ 스케줄러 정상 실행 중"
 else
     log "❌ 스케줄러 시작 실패!"
@@ -75,8 +75,8 @@ log "   PID: $BOT_PID"
 log "   로그: /tmp/telegram_bot.log"
 sleep 3
 
-# 프로세스 확인
-if ps -p $BOT_PID > /dev/null; then
+# 프로세스 확인 (kill -0은 ps 명령어가 없어도 작동)
+if kill -0 $BOT_PID 2>/dev/null; then
     log "✅ 텔레그램 봇 정상 실행 중"
     log ""
     log "📋 봇 초기화 로그:"
