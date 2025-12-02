@@ -583,7 +583,7 @@ class StockDatabase:
         return [row[0] for row in cursor.fetchall()]
     
     def get_user_watchlist_with_names(self, user_name: str) -> List[Dict]:
-        """사용자 관심 종목 목록 (종목명 포함)"""
+        """사용자 관심 종목 목록 (종목명 + 국가 정보 포함)"""
         conn = self.connect()
         cursor = conn.cursor()
         
@@ -592,18 +592,19 @@ class StockDatabase:
             return []
         
         cursor.execute('''
-            SELECT uw.ticker, MAX(dp.ticker_name) as ticker_name
+            SELECT uw.ticker, MAX(dp.ticker_name) as ticker_name, uw.country
             FROM user_watchlist uw
             LEFT JOIN daily_prices dp ON uw.ticker = dp.ticker
             WHERE uw.user_id = ? AND uw.enabled = 1
-            GROUP BY uw.ticker
+            GROUP BY uw.ticker, uw.country
         ''', (user['id'],))
         
         watchlist = []
         for row in cursor.fetchall():
             watchlist.append({
                 'ticker': row[0],
-                'name': row[1] or row[0]
+                'name': row[1] or row[0],
+                'country': row[2] or 'US'  # 기본값 US
             })
         return watchlist
     
