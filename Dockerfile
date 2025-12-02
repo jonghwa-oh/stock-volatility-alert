@@ -5,12 +5,15 @@ FROM python:3.11-slim
 # 작업 디렉토리
 WORKDIR /app
 
-# 시스템 패키지 업데이트
+# 시스템 패키지 및 한글 폰트 설치
 RUN apt-get update && apt-get install -y \
     git \
     sqlite3 \
     procps \
-    && rm -rf /var/lib/apt/lists/*
+    fonts-nanum \
+    fontconfig \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -fv
 
 # Python 패키지 설치
 COPY requirements.txt .

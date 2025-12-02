@@ -8,12 +8,49 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import matplotlib
 import os
+import platform
 from pathlib import Path
 
-# 한글 폰트 설정
-plt.rcParams['font.family'] = 'AppleGothic'
-plt.rcParams['axes.unicode_minus'] = False
+# 한글 폰트 설정 (운영체제에 따라 자동 선택)
+def setup_korean_font():
+    """운영체제에 맞는 한글 폰트를 설정합니다."""
+    system = platform.system()
+    
+    if system == 'Darwin':  # macOS
+        font_candidates = ['AppleGothic', 'Apple SD Gothic Neo']
+    elif system == 'Windows':
+        font_candidates = ['Malgun Gothic', '맑은 고딕']
+    else:  # Linux (Docker 포함)
+        font_candidates = ['NanumGothic', 'NanumBarunGothic', 'NanumSquare', 'DejaVu Sans']
+    
+    # 사용 가능한 폰트 찾기
+    available_fonts = [f.name for f in matplotlib.font_manager.fontManager.ttflist]
+    
+    for font in font_candidates:
+        if font in available_fonts:
+            plt.rcParams['font.family'] = font
+            print(f"📝 폰트 설정: {font}")
+            break
+    else:
+        # 폰트를 찾지 못한 경우 기본 폰트 사용
+        print("⚠️ 한글 폰트를 찾지 못했습니다. 기본 폰트를 사용합니다.")
+        # matplotlib 폰트 캐시 갱신 시도
+        matplotlib.font_manager._rebuild()
+        
+        # 다시 시도
+        available_fonts = [f.name for f in matplotlib.font_manager.fontManager.ttflist]
+        for font in font_candidates:
+            if font in available_fonts:
+                plt.rcParams['font.family'] = font
+                print(f"📝 폰트 재설정: {font}")
+                break
+    
+    plt.rcParams['axes.unicode_minus'] = False
+
+# 폰트 설정 실행
+setup_korean_font()
 
 
 def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
