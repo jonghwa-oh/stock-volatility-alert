@@ -47,11 +47,11 @@ log ""
 log "=================================="
 log "📅 일일 데이터 업데이트 스케줄러 시작"
 log "=================================="
-python daily_updater.py > /tmp/daily_updater.log 2>&1 &
+python daily_updater.py > /app/logs/daily_updater.log 2>&1 &
 UPDATER_PID=$!
 log "✅ 스케줄러 시작 완료!"
 log "   PID: $UPDATER_PID"
-log "   로그: /tmp/daily_updater.log"
+log "   로그: /app/logs/daily_updater.log"
 sleep 2
 
 # 프로세스 확인 (kill -0은 ps 명령어가 없어도 작동)
@@ -59,7 +59,7 @@ if kill -0 $UPDATER_PID 2>/dev/null; then
     log "✅ 스케줄러 정상 실행 중"
 else
     log "❌ 스케줄러 시작 실패!"
-    cat /tmp/daily_updater.log
+    cat /app/logs/daily_updater.log
     exit 1
 fi
 
@@ -68,11 +68,11 @@ log ""
 log "=================================="
 log "🤖 텔레그램 봇 커맨드 핸들러 시작"
 log "=================================="
-python telegram_bot_commands.py > /tmp/telegram_bot.log 2>&1 &
+python telegram_bot_commands.py > /app/logs/telegram_bot.log 2>&1 &
 BOT_PID=$!
 log "✅ 봇 시작 완료!"
 log "   PID: $BOT_PID"
-log "   로그: /tmp/telegram_bot.log"
+log "   로그: /app/logs/telegram_bot.log"
 sleep 3
 
 # 프로세스 확인 (kill -0은 ps 명령어가 없어도 작동)
@@ -80,10 +80,10 @@ if kill -0 $BOT_PID 2>/dev/null; then
     log "✅ 텔레그램 봇 정상 실행 중"
     log ""
     log "📋 봇 초기화 로그:"
-    tail -20 /tmp/telegram_bot.log
+    tail -20 /app/logs/telegram_bot.log
 else
     log "❌ 텔레그램 봇 시작 실패!"
-    cat /tmp/telegram_bot.log
+    cat /app/logs/telegram_bot.log
     exit 1
 fi
 

@@ -140,10 +140,14 @@ sudo docker-compose logs --tail=100 stock-monitor
 
 ```bash
 # 스케줄러 로그
-sudo docker exec stock_monitor cat /tmp/daily_updater.log
+sudo docker exec stock_monitor cat /app/logs/daily_updater.log
+# 또는 (volume 마운트로 외부에서 직접 접근)
+cat logs/daily_updater.log
 
 # 텔레그램 봇 로그
-sudo docker exec stock_monitor cat /tmp/telegram_bot.log
+sudo docker exec stock_monitor cat /app/logs/telegram_bot.log
+# 또는
+cat logs/telegram_bot.log
 ```
 
 ---
