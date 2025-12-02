@@ -14,6 +14,7 @@ from telegram_bot import send_telegram_sync
 from config import load_config
 import FinanceDataReader as fdr
 import os
+from log_utils import log, log_section, log_success, log_error, log_warning, log_debug
 
 
 class HybridRealtimeMonitor:
@@ -39,7 +40,7 @@ class HybridRealtimeMonitor:
         self.alert_end_time = time(23, 59)   # 24:00
         
         if self.debug_mode:
-            print("🔧 DEBUG MODE: 24시간 알림 활성화")
+            log_debug("DEBUG MODE: 24시간 알림 활성화")
     
     def _is_alert_time(self) -> bool:
         """알림 가능 시간 확인 (08:00~24:00, DEBUG_MODE시 항상 true)"""
@@ -51,9 +52,7 @@ class HybridRealtimeMonitor:
     
     async def initialize(self):
         """초기화: 종목별 매수 목표가 계산 및 국가 구분"""
-        print("\n" + "="*70)
-        print("🚀 하이브리드 실시간 매수 알림 시스템 초기화")
-        print("="*70)
+        log_section("🚀 하이브리드 실시간 매수 알림 시스템 초기화")
         
         # 활성 사용자의 관심 종목 수집 (국가 정보 포함)
         users = self.db.get_all_users()
@@ -328,8 +327,7 @@ class HybridRealtimeMonitor:
         while True:
             # 알림 시간 체크
             if not self._is_alert_time():
-                now = datetime.now().strftime('%H:%M:%S')
-                print(f"⏸️  [{now}] 알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
+                log_warning("알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
                 await asyncio.sleep(60)
                 continue
             
@@ -410,10 +408,10 @@ async def main():
         if await monitor.initialize():
             await monitor.start_monitoring()
         else:
-            print("\n⚠️  모니터링할 종목이 없습니다.")
+            log_warning("모니터링할 종목이 없습니다.")
     
     except Exception as e:
-        print(f"\n❌ 오류: {e}")
+        log_error(f"오류: {e}")
         import traceback
         traceback.print_exc()
     
@@ -422,21 +420,19 @@ async def main():
 
 
 if __name__ == "__main__":
-    print("\n" + "="*70)
-    print("🚀 하이브리드 실시간 매수 알림 시스템")
-    print("="*70)
+    log_section("🚀 하이브리드 실시간 매수 알림 시스템")
     
     debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
     time_info = "24시간 (DEBUG_MODE)" if debug_mode else "08:00~24:00"
     
-    print(f"""
-🇰🇷 한국 주식: WebSocket 실시간 모니터링
-🇺🇸 미국 주식: 1분 간격 폴링 모니터링
-⏰ 알림 시간: {time_info}
-
-실시간으로 가격을 모니터링하여
-0.5-sigma, 1-sigma, 2-sigma 매수 타이밍을 즉시 알려드립니다!
-""")
+    log("")
+    log("🇰🇷 한국 주식: WebSocket 실시간 모니터링")
+    log("🇺🇸 미국 주식: 1분 간격 폴링 모니터링")
+    log(f"⏰ 알림 시간: {time_info}")
+    log("")
+    log("실시간으로 가격을 모니터링하여")
+    log("0.5-sigma, 1-sigma, 2-sigma 매수 타이밍을 즉시 알려드립니다!")
+    log("")
     
     # 실행
     asyncio.run(main())

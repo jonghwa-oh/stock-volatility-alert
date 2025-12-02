@@ -14,6 +14,7 @@ from kis_api import KISApi
 import FinanceDataReader as fdr
 from datetime import datetime
 import traceback
+from log_utils import log, log_section, log_success, log_error, log_debug
 
 
 class TelegramBotCommandHandler:
@@ -29,7 +30,7 @@ class TelegramBotCommandHandler:
         """
         /start - 봇 시작 및 환영 메시지
         """
-        print(f"📥 /start 명령 수신 - User: {update.effective_user.first_name}, Chat ID: {update.effective_chat.id}")
+        log(f"📥 /start 명령 수신 - User: {update.effective_user.first_name}, Chat ID: {update.effective_chat.id}")
         user = update.effective_user
         chat_id = update.effective_chat.id
         
@@ -88,7 +89,7 @@ class TelegramBotCommandHandler:
         """
         /list - 내 관심 종목 목록
         """
-        print(f"📥 /list 명령 수신 - Chat ID: {update.effective_chat.id}")
+        log(f"📥 /list 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
         # 사용자 찾기
@@ -277,7 +278,7 @@ class TelegramBotCommandHandler:
         """
         /morning - 아침 알림 수동 받기
         """
-        print(f"📥 /morning 명령 수신 - Chat ID: {update.effective_chat.id}")
+        log(f"📥 /morning 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
         # 사용자 찾기
@@ -309,8 +310,7 @@ class TelegramBotCommandHandler:
             
         except Exception as e:
             await update.message.reply_text(f"❌ 분석 실패: {str(e)}\n\n{traceback.format_exc()}")
-            print(f"❌ 분석 실패: {e}")
-            import traceback
+            log_error(f"분석 실패: {e}")
             traceback.print_exc()
     
     async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -413,15 +413,13 @@ class TelegramBotCommandHandler:
     
     def run(self):
         """봇 실행"""
-        print("\n" + "="*70)
-        print("🤖 텔레그램 봇 커맨드 핸들러 시작")
-        print("="*70)
-        print(f"✅ Bot Token: {self.bot_token[:20]}...{self.bot_token[-10:]}")
+        log_section("🤖 텔레그램 봇 커맨드 핸들러 시작")
+        log_success(f"Bot Token: {self.bot_token[:20]}...{self.bot_token[-10:]}")
         
         # Application 생성
-        print("🔧 Telegram Application 생성 중...")
+        log("🔧 Telegram Application 생성 중...")
         application = Application.builder().token(self.bot_token).build()
-        print("✅ Application 생성 완료!")
+        log_success("Application 생성 완료!")
         
         # 커맨드 핸들러 등록
         application.add_handler(CommandHandler("start", self.start_command))
@@ -432,24 +430,27 @@ class TelegramBotCommandHandler:
         application.add_handler(CommandHandler("morning", self.morning_command))
         application.add_handler(CommandHandler("status", self.status_command))
         
-        print("\n✅ 커맨드 핸들러 등록 완료:")
-        print("   - /start: 봇 시작")
-        print("   - /help: 도움말")
-        print("   - /list: 종목 목록")
-        print("   - /add: 종목 추가")
-        print("   - /remove: 종목 삭제")
-        print("   - /morning: 아침 알림")
-        print("   - /status: 현재가 확인")
+        log("")
+        log_success("커맨드 핸들러 등록 완료:")
+        log("   - /start: 봇 시작")
+        log("   - /help: 도움말")
+        log("   - /list: 종목 목록")
+        log("   - /add: 종목 추가")
+        log("   - /remove: 종목 삭제")
+        log("   - /morning: 아침 알림")
+        log("   - /status: 현재가 확인")
         
-        print("\n🚀 봇 시작... (Ctrl+C로 종료)")
-        print("="*70 + "\n")
+        log("")
+        log("🚀 봇 시작... (Ctrl+C로 종료)")
+        log("="*70)
+        log("")
         
         # 봇 실행
-        print("🔄 Polling 시작...")
+        log("🔄 Polling 시작...")
         try:
             application.run_polling(allowed_updates=Update.ALL_TYPES)
         except Exception as e:
-            print(f"❌ 봇 실행 오류: {e}")
+            log_error(f"봇 실행 오류: {e}")
             traceback.print_exc()
 
 
