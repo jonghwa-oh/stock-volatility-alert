@@ -4,6 +4,7 @@
 사용자가 텔레그램에서 봇에게 명령을 보내면 처리하는 모듈
 """
 import asyncio
+from pathlib import Path
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from database import StockDatabase
@@ -15,6 +16,7 @@ import FinanceDataReader as fdr
 from datetime import datetime
 import traceback
 from log_utils import log, log_section, log_success, log_error, log_debug
+from telegram_bot import send_telegram_sync
 
 
 class TelegramBotCommandHandler:
@@ -303,13 +305,57 @@ class TelegramBotCommandHandler:
                 await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
                 return
             
-            # 알림 전송
-            send_daily_alerts(analysis_results)
+            # 명령 실행한 사용자에게만 알림 전송
+            from telegram_bot import send_telegram_message_with_chart
+            
+            # 사용자 관심 종목 필터링
+            watchlist = self.db.get_user_watchlist_with_names(user['name'])
+            user_tickers = [stock['ticker'] for stock in watchlist]
+            
+            # 사용자의 종목만 필터링
+            user_results = [r for r in analysis_results if r['ticker'] in user_tickers]
+            
+            if not user_results:
+                await update.message.reply_text("⚠️ 분석 결과가 없습니다.")
+                return
+            
+            # 차트와 함께 메시지 전송
+            for result in user_results:
+                message = f"""
+📊 {result['name']} ({result['ticker']})
+
+💰 현재가: {result['current_price_str']}
+
+🎯 매수 목표가:
+  🧪 테스트: {result['target_05x_str']} ({result['drop_05x']:.2f}% 하락)
+  1차 매수: {result['target_1x_str']} ({result['drop_1x']:.2f}% 하락)
+  2차 매수: {result['target_2x_str']} ({result['drop_2x']:.2f}% 하락)
+
+💵 투자금액: {result['investment_str']}
+📈 매수수량:
+  1차: {result['shares_1x']}주 (평단가 {result['avg_price_1x_str']})
+  2차: {result['shares_2x']}주 (평단가 {result['avg_price_2x_str']})
+"""
+                
+                # 차트 파일 경로
+                chart_file = result.get('chart_file')
+                
+                if chart_file and Path(chart_file).exists():
+                    # 차트와 함께 전송
+                    send_telegram_message_with_chart(
+                        user['chat_id'],
+                        message,
+                        chart_file
+                    )
+                else:
+                    # 차트 없이 텍스트만
+                    send_telegram_sync(user['chat_id'], message)
             
             await update.message.reply_text("✅ 분석 완료! 차트를 확인하세요.")
             
         except Exception as e:
-            await update.message.reply_text(f"❌ 분석 실패: {str(e)}\n\n{traceback.format_exc()}")
+            error_msg = f"❌ 분석 실패: {str(e)}"
+            await update.message.reply_text(error_msg)
             log_error(f"분석 실패: {e}")
             traceback.print_exc()
     
