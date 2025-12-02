@@ -12,6 +12,7 @@ from volatility_analysis import analyze_daily_volatility, visualize_volatility
 from telegram_bot import send_telegram_sync
 from config import TELEGRAM_CONFIG
 from scheduler_config import SCHEDULE_CONFIG
+from kis_api import KISApi
 
 
 def send_message(chat_id, text):
@@ -23,6 +24,43 @@ def send_photo(chat_id, photo_path, caption=None):
     """이미지 전송 wrapper"""
     message = caption if caption else None
     send_telegram_sync(TELEGRAM_CONFIG['BOT_TOKEN'], chat_id, message=message, photo_path=photo_path)
+
+
+def get_stock_name(ticker: str, fallback_name: str) -> str:
+    """
+    종목명 가져오기 (티커와 이름이 같으면 KIS API에서 조회)
+    
+    Args:
+        ticker: 종목 코드
+        fallback_name: 기본 이름 (DB에서 가져온 값)
+    
+    Returns:
+        종목명
+    """
+    # 이름이 티커와 다르면 그대로 반환
+    if fallback_name and fallback_name != ticker:
+        return fallback_name
+    
+    # 한국 주식인 경우 KIS API에서 종목명 조회
+    if ticker.isdigit():
+        try:
+            kis = KISApi()
+            price_data = kis.get_stock_price(ticker)
+            if price_data and 'name' in price_data and price_data['name']:
+                return price_data['name']
+        except Exception as e:
+            print(f"  ⚠️ KIS API 종목명 조회 실패 ({ticker}): {e}")
+    else:
+        # 미국 주식인 경우 KIS API에서 종목명 조회
+        try:
+            kis = KISApi()
+            price_data = kis.get_overseas_stock_price(ticker)
+            if price_data and 'name' in price_data and price_data['name']:
+                return price_data['name']
+        except Exception as e:
+            print(f"  ⚠️ KIS API 종목명 조회 실패 ({ticker}): {e}")
+    
+    return fallback_name or ticker
 
 
 def get_unique_tickers():
@@ -40,7 +78,10 @@ def get_unique_tickers():
         # 사용자의 관심 종목 조회
         watchlist = db.get_user_watchlist_with_names(user['name'])
         for stock in watchlist:
-            unique_tickers[stock['ticker']] = stock['name']
+            ticker = stock['ticker']
+            # 종목명이 없거나 티커와 같으면 KIS API에서 가져오기
+            name = get_stock_name(ticker, stock['name'])
+            unique_tickers[ticker] = name
     
     db.close()
     return unique_tickers

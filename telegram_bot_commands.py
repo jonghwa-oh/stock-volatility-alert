@@ -357,7 +357,12 @@ class TelegramBotCommandHandler:
                 ticker = stock['ticker']
                 name = stock['name']
                 
-                log_debug(f"   [{ticker}] 처리 중...")
+                # 종목명이 티커와 같으면 분석 결과에서 이름 가져오기
+                result = analysis_results.get(ticker)
+                if result and result.get('name') and result['name'] != ticker:
+                    name = result['name']
+                
+                log_debug(f"   [{ticker}] 처리 중... (이름: {name})")
                 
                 # 분석 결과 가져오기 (analysis_results는 딕셔너리)
                 result = analysis_results.get(ticker)
