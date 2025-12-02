@@ -51,7 +51,20 @@ def daily_analysis_job():
     log_section("📊 오늘의 매수 전략 분석 시작")
     
     try:
-        send_daily_alerts()
+        # 1. 분석 실행
+        from daily_analysis import analyze_and_generate_charts
+        log("🔍 차트 생성 및 분석 중...")
+        analysis_results = analyze_and_generate_charts()
+        
+        if not analysis_results:
+            log_error("분석 결과가 없습니다.")
+            return
+        
+        log_success(f"분석 완료: {len(analysis_results)}개 종목")
+        
+        # 2. 사용자별 알림 전송
+        send_daily_alerts(analysis_results)
+        
     except Exception as e:
         log_error(f"일일 분석 실패: {e}")
         import traceback
@@ -80,13 +93,21 @@ def main():
     log_success("스케줄 등록 완료:")
     log(f"   - 다음 08:00 실행: {schedule.next_run()}")
     
-    # 시작 시 한 번 실행 (어제 데이터 확인)
+    # 시작 시 데이터 확인만 (알림 X)
     log("")
-    log("🔍 시작 시 데이터 확인...")
-    morning_update_job()
+    log("🔍 시작 시 데이터 상태 확인...")
+    try:
+        dc = DataCollector()
+        dc.update_daily_data()
+        dc.close()
+        log_success("데이터 확인 완료!")
+    except Exception as e:
+        log_error(f"데이터 확인 실패: {e}")
     
     log("")
     log_success("스케줄 등록 완료! 다음 실행 대기 중...")
+    log("⏰ 다음 08:00 - 데이터 업데이트 + 놓친 알림")
+    log("⏰ 다음 08:50 - 아침 매수 전략 알림")
     
     # 무한 루프
     loop_count = 0
