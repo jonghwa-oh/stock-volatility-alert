@@ -89,8 +89,8 @@ python init_settings.py
 
 **입력 예시:**
 ```
-Bot Token: 8105040252:AAHXbWn0FV3ymw9PTzlbPMyIC6JoehY-3pM
-기본 Chat ID (선택): 6633793503
+Bot Token: (BotFather에서 받은 토큰 입력)
+기본 Chat ID (선택): (텔레그램 Chat ID 입력)
 기본 투자 금액 (원): 1000000
 ```
 
