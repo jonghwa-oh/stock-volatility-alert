@@ -112,16 +112,42 @@ class TelegramBotCommandHandler:
             telegram_user = update.effective_user
             
             # 이미 등록된 사용자인지 확인
-            users = self.db.get_all_users()
-            existing_user = next((u for u in users if u['chat_id'] == chat_id), None)
+            # 전체 사용자 조회 (비활성 포함) - 중복 체크용
+            conn = self.db.connect()
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, name, chat_id, investment_amount, enabled, notification_enabled FROM users')
+            all_users = []
+            for row in cursor.fetchall():
+                all_users.append({
+                    'id': row[0], 'name': row[1], 'chat_id': str(row[2]),
+                    'investment_amount': row[3], 'enabled': row[4],
+                    'notification_enabled': row[5] if len(row) > 5 else 1
+                })
+            
+            # 이미 등록된 chat_id인지 확인
+            existing_user = next((u for u in all_users if u['chat_id'] == chat_id), None)
             
             if existing_user:
-                await update.message.reply_text(
-                    f"✅ 이미 등록되어 있습니다!\n\n"
-                    f"👤 이름: {existing_user['name']}\n"
-                    f"💰 투자금: {int(existing_user['investment_amount']):,}원\n\n"
-                    f"종목을 추가하려면 /add TICKER 를 사용하세요."
-                )
+                # 비활성 사용자면 활성화
+                if not existing_user['enabled']:
+                    cursor.execute('UPDATE users SET enabled = 1 WHERE id = ?', (existing_user['id'],))
+                    conn.commit()
+                    await update.message.reply_text(
+                        f"🎉 다시 오셨군요, {existing_user['name']}님!\n\n"
+                        f"✅ 계정이 다시 활성화되었습니다.\n"
+                        f"💰 투자금: {int(existing_user['investment_amount']):,}원\n\n"
+                        f"📊 사용 가능한 명령어:\n"
+                        f"/list - 관심 종목 보기\n"
+                        f"/add TQQQ - 종목 추가\n"
+                        f"/morning - 아침 분석 받기"
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"✅ 이미 등록되어 있습니다!\n\n"
+                        f"👤 이름: {existing_user['name']}\n"
+                        f"💰 투자금: {int(existing_user['investment_amount']):,}원\n\n"
+                        f"종목을 추가하려면 /add TICKER 를 사용하세요."
+                    )
                 return
             
             # 인자 확인
@@ -154,33 +180,24 @@ class TelegramBotCommandHandler:
                 )
                 return
             
-            # chat_id 중복 확인 (이미 등록된 사용자인지)
-            existing_chat = next((u for u in users if str(u['chat_id']) == chat_id), None)
-            if existing_chat:
-                await update.message.reply_text(
-                    f"✅ 이미 등록되어 있습니다!\n\n"
-                    f"👤 이름: {existing_chat['name']}\n"
-                    f"💰 투자금: {int(existing_chat['investment_amount']):,}원\n\n"
-                    f"📊 사용 가능한 명령어:\n"
-                    f"/list - 관심 종목 보기\n"
-                    f"/add TQQQ - 종목 추가\n"
-                    f"/morning - 아침 분석 받기"
-                )
-                return
-            
-            # 이름 중복 확인
-            existing_name = next((u for u in users if u['name'] == name), None)
+            # 이름 중복 확인 (비활성 사용자 포함)
+            existing_name = next((u for u in all_users if u['name'] == name), None)
             if existing_name:
-                await update.message.reply_text(
-                    f"❌ '{name}' 이름이 이미 사용 중입니다.\n\n"
-                    "다른 이름을 사용해주세요."
-                )
+                # 비활성 사용자이고 chat_id가 다른 경우
+                if not existing_name['enabled']:
+                    await update.message.reply_text(
+                        f"⚠️ '{name}' 이름이 이미 사용 중입니다.\n"
+                        f"(비활성 상태의 다른 사용자)\n\n"
+                        "다른 이름을 사용해주세요."
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"❌ '{name}' 이름이 이미 사용 중입니다.\n\n"
+                        "다른 이름을 사용해주세요."
+                    )
                 return
             
             # DB에 사용자 추가
-            conn = self.db.connect()
-            cursor = conn.cursor()
-            
             cursor.execute('''
                 INSERT INTO users (name, chat_id, investment_amount, enabled, notification_enabled)
                 VALUES (?, ?, ?, 1, 1)
