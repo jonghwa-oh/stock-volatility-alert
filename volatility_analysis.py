@@ -9,6 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.font_manager as fm
 import os
 import platform
 from pathlib import Path
@@ -18,39 +19,79 @@ def setup_korean_font():
     """운영체제에 맞는 한글 폰트를 설정합니다."""
     system = platform.system()
     
+    # matplotlib 캐시 삭제 및 폰트 재로드
+    cache_dir = matplotlib.get_cachedir()
+    if cache_dir and os.path.exists(cache_dir):
+        for f in os.listdir(cache_dir):
+            if f.startswith('fontlist'):
+                try:
+                    os.remove(os.path.join(cache_dir, f))
+                except:
+                    pass
+    
+    # 폰트 매니저 재초기화
+    fm._load_fontmanager(try_read_cache=False)
+    
     if system == 'Darwin':  # macOS
         font_candidates = ['AppleGothic', 'Apple SD Gothic Neo']
     elif system == 'Windows':
         font_candidates = ['Malgun Gothic', '맑은 고딕']
     else:  # Linux (Docker 포함)
-        font_candidates = ['NanumGothic', 'NanumBarunGothic', 'NanumSquare', 'DejaVu Sans']
+        # Nanum 폰트 직접 경로 탐색
+        font_paths = [
+            '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+            '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
+            '/usr/share/fonts/nanum/NanumGothic.ttf',
+        ]
+        
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                # 폰트 직접 등록
+                fm.fontManager.addfont(font_path)
+                font_prop = fm.FontProperties(fname=font_path)
+                plt.rcParams['font.family'] = font_prop.get_name()
+                plt.rcParams['axes.unicode_minus'] = False
+                print(f"📝 폰트 설정 완료: {font_path}")
+                return
+        
+        font_candidates = ['NanumGothic', 'NanumBarunGothic', 'DejaVu Sans']
     
     # 사용 가능한 폰트 찾기
-    available_fonts = [f.name for f in matplotlib.font_manager.fontManager.ttflist]
+    available_fonts = set([f.name for f in fm.fontManager.ttflist])
     
     for font in font_candidates:
         if font in available_fonts:
             plt.rcParams['font.family'] = font
+            plt.rcParams['axes.unicode_minus'] = False
             print(f"📝 폰트 설정: {font}")
-            break
-    else:
-        # 폰트를 찾지 못한 경우 기본 폰트 사용
-        print("⚠️ 한글 폰트를 찾지 못했습니다. 기본 폰트를 사용합니다.")
-        # matplotlib 폰트 캐시 갱신 시도
-        matplotlib.font_manager._rebuild()
-        
-        # 다시 시도
-        available_fonts = [f.name for f in matplotlib.font_manager.fontManager.ttflist]
-        for font in font_candidates:
-            if font in available_fonts:
-                plt.rcParams['font.family'] = font
-                print(f"📝 폰트 재설정: {font}")
-                break
+            return
     
+    # 폰트를 찾지 못한 경우
+    print("⚠️ 한글 폰트를 찾지 못했습니다.")
+    print(f"   사용 가능한 폰트 샘플: {list(available_fonts)[:10]}")
     plt.rcParams['axes.unicode_minus'] = False
 
 # 폰트 설정 실행
 setup_korean_font()
+
+
+def get_stock_name_from_api(ticker: str) -> str:
+    """KIS API에서 종목명을 가져옵니다."""
+    try:
+        from kis_api import KISApi
+        kis = KISApi()
+        
+        if ticker.isdigit():  # 한국 주식
+            price_data = kis.get_stock_price(ticker)
+        else:  # 미국 주식
+            price_data = kis.get_overseas_stock_price(ticker)
+        
+        if price_data and 'name' in price_data and price_data['name']:
+            return price_data['name']
+    except Exception as e:
+        print(f"  ⚠️ KIS API 종목명 조회 실패: {e}")
+    
+    return ticker
 
 
 def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
@@ -65,6 +106,11 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     # 국가 판별 (한국: 숫자 티커, 미국: 알파벳 티커)
     is_korean = ticker.isdigit()
     currency = "원" if is_korean else "$"
+    
+    # 종목명이 티커와 같으면 KIS API에서 조회
+    if not ticker_name or ticker_name == ticker:
+        ticker_name = get_stock_name_from_api(ticker)
+        print(f"📌 종목명 조회: {ticker} → {ticker_name}")
     
     print("="*70)
     print(f"📊 {ticker_name} ({ticker}) 일일 변동성 분석")
