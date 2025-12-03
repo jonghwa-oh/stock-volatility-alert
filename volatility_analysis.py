@@ -12,64 +12,125 @@ import matplotlib
 import matplotlib.font_manager as fm
 import os
 import platform
+import subprocess
 from pathlib import Path
 
-# 한글 폰트 설정 (운영체제에 따라 자동 선택)
+# 전역 폰트 설정 변수
+_FONT_CONFIGURED = False
+_FONT_PATH = None
+
+def find_nanum_font_path():
+    """시스템에서 나눔 폰트 경로를 찾습니다."""
+    # 1. 알려진 경로에서 찾기
+    known_paths = [
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
+        '/usr/share/fonts/nanum/NanumGothic.ttf',
+        '/usr/share/fonts/opentype/nanum/NanumGothic.ttf',
+    ]
+    
+    for path in known_paths:
+        if os.path.exists(path):
+            return path
+    
+    # 2. fc-list 명령어로 찾기
+    try:
+        result = subprocess.run(
+            ['fc-list', ':lang=ko', '-f', '%{file}\n'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            for line in result.stdout.strip().split('\n'):
+                if 'nanum' in line.lower() and line.endswith('.ttf'):
+                    return line
+    except Exception as e:
+        print(f"  fc-list 실행 실패: {e}")
+    
+    # 3. find 명령어로 찾기
+    try:
+        result = subprocess.run(
+            ['find', '/usr/share/fonts', '-name', '*anum*.ttf', '-type', 'f'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip().split('\n')[0]
+    except Exception as e:
+        print(f"  find 실행 실패: {e}")
+    
+    return None
+
+
 def setup_korean_font():
     """운영체제에 맞는 한글 폰트를 설정합니다."""
-    system = platform.system()
+    global _FONT_CONFIGURED, _FONT_PATH
     
-    # matplotlib 캐시 삭제 및 폰트 재로드
+    if _FONT_CONFIGURED and _FONT_PATH:
+        return _FONT_PATH
+    
+    system = platform.system()
+    print(f"🔧 폰트 설정 중... (OS: {system})")
+    
+    # matplotlib 캐시 삭제
     cache_dir = matplotlib.get_cachedir()
     if cache_dir and os.path.exists(cache_dir):
         for f in os.listdir(cache_dir):
             if f.startswith('fontlist'):
                 try:
                     os.remove(os.path.join(cache_dir, f))
+                    print(f"   캐시 삭제: {f}")
                 except:
                     pass
     
-    # 폰트 매니저 재초기화
-    fm._load_fontmanager(try_read_cache=False)
-    
     if system == 'Darwin':  # macOS
-        font_candidates = ['AppleGothic', 'Apple SD Gothic Neo']
+        plt.rcParams['font.family'] = 'AppleGothic'
+        plt.rcParams['axes.unicode_minus'] = False
+        _FONT_CONFIGURED = True
+        print(f"📝 폰트 설정: AppleGothic (macOS)")
+        return None
+        
     elif system == 'Windows':
-        font_candidates = ['Malgun Gothic', '맑은 고딕']
+        plt.rcParams['font.family'] = 'Malgun Gothic'
+        plt.rcParams['axes.unicode_minus'] = False
+        _FONT_CONFIGURED = True
+        print(f"📝 폰트 설정: Malgun Gothic (Windows)")
+        return None
+        
     else:  # Linux (Docker 포함)
-        # Nanum 폰트 직접 경로 탐색
-        font_paths = [
-            '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
-            '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
-            '/usr/share/fonts/nanum/NanumGothic.ttf',
-        ]
+        font_path = find_nanum_font_path()
         
-        for font_path in font_paths:
-            if os.path.exists(font_path):
-                # 폰트 직접 등록
-                fm.fontManager.addfont(font_path)
-                font_prop = fm.FontProperties(fname=font_path)
-                plt.rcParams['font.family'] = font_prop.get_name()
-                plt.rcParams['axes.unicode_minus'] = False
-                print(f"📝 폰트 설정 완료: {font_path}")
-                return
-        
-        font_candidates = ['NanumGothic', 'NanumBarunGothic', 'DejaVu Sans']
-    
-    # 사용 가능한 폰트 찾기
-    available_fonts = set([f.name for f in fm.fontManager.ttflist])
-    
-    for font in font_candidates:
-        if font in available_fonts:
-            plt.rcParams['font.family'] = font
+        if font_path:
+            print(f"   나눔 폰트 발견: {font_path}")
+            _FONT_PATH = font_path
+            _FONT_CONFIGURED = True
+            
+            # 폰트 매니저에 등록
+            fm.fontManager.addfont(font_path)
+            
+            # rcParams 설정
+            font_prop = fm.FontProperties(fname=font_path)
+            font_name = font_prop.get_name()
+            plt.rcParams['font.family'] = font_name
             plt.rcParams['axes.unicode_minus'] = False
-            print(f"📝 폰트 설정: {font}")
-            return
+            print(f"📝 폰트 설정 완료: {font_name}")
+            return font_path
+        else:
+            print("⚠️ 나눔 폰트를 찾지 못했습니다.")
+            # 설치된 폰트 목록 출력
+            available = [f.name for f in fm.fontManager.ttflist][:20]
+            print(f"   사용 가능한 폰트: {available}")
+            plt.rcParams['axes.unicode_minus'] = False
+            _FONT_CONFIGURED = True
+            return None
+
+
+def get_font_properties():
+    """차트용 FontProperties 객체를 반환합니다."""
+    global _FONT_PATH
     
-    # 폰트를 찾지 못한 경우
-    print("⚠️ 한글 폰트를 찾지 못했습니다.")
-    print(f"   사용 가능한 폰트 샘플: {list(available_fonts)[:10]}")
-    plt.rcParams['axes.unicode_minus'] = False
+    if _FONT_PATH and os.path.exists(_FONT_PATH):
+        return fm.FontProperties(fname=_FONT_PATH)
+    return None
+
 
 # 폰트 설정 실행
 setup_korean_font()
@@ -272,6 +333,10 @@ def visualize_volatility(data):
     Args:
         data: analyze_daily_volatility의 반환 데이터
     """
+    # 차트 생성 전 폰트 재설정
+    font_path = setup_korean_font()
+    font_prop = get_font_properties()
+    
     close_prices = data['close_prices']
     daily_returns = data['daily_returns']
     current = data['current_price']
@@ -286,10 +351,10 @@ def visualize_volatility(data):
     is_korean = ticker.isdigit()
     if is_korean:
         chart_title = f"{ticker_name} ({ticker})"
-        currency = "원"
-        current_str = f"{current:,.0f}{currency}"
-        target_1x_str = f"{target_1x:,.0f}{currency}"
-        target_2x_str = f"{target_2x:,.0f}{currency}"
+        currency = "won"  # 영문으로 변경 (폰트 문제 대비)
+        current_str = f"{current:,.0f} {currency}"
+        target_1x_str = f"{target_1x:,.0f} {currency}"
+        target_2x_str = f"{target_2x:,.0f} {currency}"
     else:
         chart_title = f"{ticker} - {ticker_name}"
         currency = "$"
@@ -300,8 +365,14 @@ def visualize_volatility(data):
     # 그래프 생성 (3개)
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 12))
     
+    # 폰트 적용 (fontproperties 직접 사용)
+    if font_prop:
+        for ax in [ax1, ax2, ax3]:
+            for label in ax.get_xticklabels() + ax.get_yticklabels():
+                label.set_fontproperties(font_prop)
+    
     # 그래프 1: 가격 차트
-    ax1.plot(close_prices.index, close_prices.values, 'b-', linewidth=2, label='종가')
+    ax1.plot(close_prices.index, close_prices.values, 'b-', linewidth=2, label='Close')
     # 현재가 및 목표가 라인
     target_05x = data['target_05x']
     drop_05x = data['drop_05x']
@@ -312,38 +383,69 @@ def visualize_volatility(data):
     else:
         target_05x_str = f"{currency}{target_05x:,.2f}"
     
-    ax1.axhline(y=current, color='red', linestyle='-', linewidth=2.5, label=f'현재가: {current_str}')
-    ax1.axhline(y=target_05x, color='lightblue', linestyle=':', linewidth=2, 
-                label=f'테스트 매수: {target_05x_str} ({drop_05x:.2f}% 하락)')
-    ax1.axhline(y=target_1x, color='blue', linestyle='--', linewidth=2, 
-                label=f'1차 매수 목표: {target_1x_str} ({data["drop_1x"]:.2f}% 하락)')
-    ax1.axhline(y=target_2x, color='darkblue', linestyle='--', linewidth=2,
-                label=f'2차 매수 목표: {target_2x_str} ({data["drop_2x"]:.2f}% 하락)')
+    # 한글/영문 레이블 (폰트 문제 대비)
+    use_korean = font_prop is not None
     
-    ax1.set_title(f'{chart_title} - 1년간 가격 변동', fontsize=14, fontweight='bold')
-    ax1.set_xlabel('날짜', fontsize=12)
-    ax1.set_ylabel('가격', fontsize=12)
-    ax1.legend(loc='best', fontsize=10)
+    if use_korean:
+        lbl_current = f'현재가: {current_str}'
+        lbl_test = f'테스트: {target_05x_str} ({drop_05x:.2f}%)'
+        lbl_1st = f'1차 목표: {target_1x_str} ({data["drop_1x"]:.2f}%)'
+        lbl_2nd = f'2차 목표: {target_2x_str} ({data["drop_2x"]:.2f}%)'
+        lbl_title1 = f'{chart_title} - Price (1Y)'
+        lbl_date = 'Date'
+        lbl_price = 'Price'
+        lbl_avg = f'Avg: {mean_ret:+.2f}%'
+        lbl_std1p = f'+1 Std: {std_ret:.2f}%'
+        lbl_std1m = f'-1 Std: -{std_ret:.2f}%'
+        lbl_std2p = f'+2 Std: {2*std_ret:.2f}%'
+        lbl_std2m = f'-2 Std: -{2*std_ret:.2f}%'
+        lbl_title2 = f'{chart_title} - Daily Return (%)'
+        lbl_return = 'Daily Return (%)'
+    else:
+        lbl_current = f'Current: {current_str}'
+        lbl_test = f'Test: {target_05x_str} ({drop_05x:.2f}%)'
+        lbl_1st = f'1st Target: {target_1x_str} ({data["drop_1x"]:.2f}%)'
+        lbl_2nd = f'2nd Target: {target_2x_str} ({data["drop_2x"]:.2f}%)'
+        lbl_title1 = f'{chart_title} - Price (1Y)'
+        lbl_date = 'Date'
+        lbl_price = 'Price'
+        lbl_avg = f'Avg: {mean_ret:+.2f}%'
+        lbl_std1p = f'+1 Std: {std_ret:.2f}%'
+        lbl_std1m = f'-1 Std: -{std_ret:.2f}%'
+        lbl_std2p = f'+2 Std: {2*std_ret:.2f}%'
+        lbl_std2m = f'-2 Std: -{2*std_ret:.2f}%'
+        lbl_title2 = f'{chart_title} - Daily Return (%)'
+        lbl_return = 'Daily Return (%)'
+    
+    ax1.axhline(y=current, color='red', linestyle='-', linewidth=2.5, label=lbl_current)
+    ax1.axhline(y=target_05x, color='lightblue', linestyle=':', linewidth=2, label=lbl_test)
+    ax1.axhline(y=target_1x, color='blue', linestyle='--', linewidth=2, label=lbl_1st)
+    ax1.axhline(y=target_2x, color='darkblue', linestyle='--', linewidth=2, label=lbl_2nd)
+    
+    ax1.set_title(lbl_title1, fontsize=14, fontweight='bold', fontproperties=font_prop)
+    ax1.set_xlabel(lbl_date, fontsize=12, fontproperties=font_prop)
+    ax1.set_ylabel(lbl_price, fontsize=12, fontproperties=font_prop)
+    ax1.legend(loc='best', fontsize=10, prop=font_prop)
     ax1.grid(True, alpha=0.3)
     
     # 그래프 2: 일일 변동률 시계열
     colors = ['red' if x < 0 else 'green' for x in daily_returns]
     ax2.bar(daily_returns.index, daily_returns.values, color=colors, alpha=0.6, width=1)
     ax2.axhline(y=0, color='black', linestyle='-', linewidth=1)
-    ax2.axhline(y=mean_ret, color='blue', linestyle='--', linewidth=2, label=f'평균: {mean_ret:+.2f}%')
-    ax2.axhline(y=std_ret, color='orange', linestyle=':', linewidth=2, label=f'+1 표준편차: {std_ret:.2f}%')
-    ax2.axhline(y=-std_ret, color='orange', linestyle=':', linewidth=2, label=f'-1 표준편차: -{std_ret:.2f}%')
-    ax2.axhline(y=2*std_ret, color='purple', linestyle=':', linewidth=1.5, alpha=0.7, label=f'+2 표준편차: {2*std_ret:.2f}%')
-    ax2.axhline(y=-2*std_ret, color='purple', linestyle=':', linewidth=1.5, alpha=0.7, label=f'-2 표준편차: -{2*std_ret:.2f}%')
+    ax2.axhline(y=mean_ret, color='blue', linestyle='--', linewidth=2, label=lbl_avg)
+    ax2.axhline(y=std_ret, color='orange', linestyle=':', linewidth=2, label=lbl_std1p)
+    ax2.axhline(y=-std_ret, color='orange', linestyle=':', linewidth=2, label=lbl_std1m)
+    ax2.axhline(y=2*std_ret, color='purple', linestyle=':', linewidth=1.5, alpha=0.7, label=lbl_std2p)
+    ax2.axhline(y=-2*std_ret, color='purple', linestyle=':', linewidth=1.5, alpha=0.7, label=lbl_std2m)
     
     # 표준편차 범위 표시
-    ax2.fill_between(daily_returns.index, -std_ret, std_ret, alpha=0.1, color='orange', label='1 표준편차 범위')
-    ax2.fill_between(daily_returns.index, -2*std_ret, 2*std_ret, alpha=0.05, color='purple', label='2 표준편차 범위')
+    ax2.fill_between(daily_returns.index, -std_ret, std_ret, alpha=0.1, color='orange', label='1 Std Range')
+    ax2.fill_between(daily_returns.index, -2*std_ret, 2*std_ret, alpha=0.05, color='purple', label='2 Std Range')
     
-    ax2.set_title(f'{chart_title} - 일일 변동률 (수익률 %)', fontsize=14, fontweight='bold')
-    ax2.set_xlabel('날짜', fontsize=12)
-    ax2.set_ylabel('일일 변동률 (%)', fontsize=12)
-    ax2.legend(loc='best', fontsize=9)
+    ax2.set_title(lbl_title2, fontsize=14, fontweight='bold', fontproperties=font_prop)
+    ax2.set_xlabel(lbl_date, fontsize=12, fontproperties=font_prop)
+    ax2.set_ylabel(lbl_return, fontsize=12, fontproperties=font_prop)
+    ax2.legend(loc='best', fontsize=9, prop=font_prop)
     ax2.grid(True, alpha=0.3)
     
     # 그래프 3: 일일 변동률 분포 (히스토그램)
@@ -352,32 +454,32 @@ def visualize_volatility(data):
     # 정규분포 곡선
     x = np.linspace(daily_returns.min(), daily_returns.max(), 100)
     normal_dist = (1 / (std_ret * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mean_ret) / std_ret) ** 2)
-    ax3.plot(x, normal_dist, 'r-', linewidth=2, label='정규분포')
+    ax3.plot(x, normal_dist, 'r-', linewidth=2, label='Normal Dist')
     
     # 기준선
-    ax3.axvline(x=0, color='black', linestyle='-', linewidth=2, label='0% (변동 없음)')
-    ax3.axvline(x=mean_ret, color='blue', linestyle='--', linewidth=2, label=f'평균: {mean_ret:+.2f}%')
-    ax3.axvline(x=-std_ret, color='orange', linestyle=':', linewidth=2.5, label=f'-1 표준편차: -{std_ret:.2f}%')
-    ax3.axvline(x=-2*std_ret, color='purple', linestyle=':', linewidth=2.5, label=f'-2 표준편차: -{2*std_ret:.2f}%')
+    ax3.axvline(x=0, color='black', linestyle='-', linewidth=2, label='0% (No Change)')
+    ax3.axvline(x=mean_ret, color='blue', linestyle='--', linewidth=2, label=f'Avg: {mean_ret:+.2f}%')
+    ax3.axvline(x=-std_ret, color='orange', linestyle=':', linewidth=2.5, label=f'-1 Std: -{std_ret:.2f}%')
+    ax3.axvline(x=-2*std_ret, color='purple', linestyle=':', linewidth=2.5, label=f'-2 Std: -{2*std_ret:.2f}%')
     
-    ax3.set_title(f'{chart_title} - 일일 변동률 분포', fontsize=14, fontweight='bold')
-    ax3.set_xlabel('일일 변동률 (%)', fontsize=12)
-    ax3.set_ylabel('빈도 밀도', fontsize=12)
-    ax3.legend(loc='best', fontsize=10)
+    ax3.set_title(f'{chart_title} - Distribution', fontsize=14, fontweight='bold', fontproperties=font_prop)
+    ax3.set_xlabel('Daily Return (%)', fontsize=12, fontproperties=font_prop)
+    ax3.set_ylabel('Frequency', fontsize=12, fontproperties=font_prop)
+    ax3.legend(loc='best', fontsize=10, prop=font_prop)
     ax3.grid(True, alpha=0.3, axis='y')
     
-    # 통계 정보 박스
-    textstr = f'평균 변동: {mean_ret:+.3f}%\n'
-    textstr += f'표준편차: {std_ret:.3f}%\n'
-    textstr += f'최대 상승: {data["max_gain"]:+.2f}%\n'
-    textstr += f'최대 하락: {data["max_loss"]:+.2f}%\n'
-    textstr += f'━━━━━━━━━━━━━━\n'
-    textstr += f'상승일: {data["up_days"]}일\n'
-    textstr += f'하락일: {data["down_days"]}일'
+    # 통계 정보 박스 (영문)
+    textstr = f'Avg: {mean_ret:+.3f}%\n'
+    textstr += f'Std: {std_ret:.3f}%\n'
+    textstr += f'Max Up: {data["max_gain"]:+.2f}%\n'
+    textstr += f'Max Down: {data["max_loss"]:+.2f}%\n'
+    textstr += f'─────────────\n'
+    textstr += f'Up Days: {data["up_days"]}\n'
+    textstr += f'Down Days: {data["down_days"]}'
     
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
     ax3.text(0.98, 0.98, textstr, transform=ax3.transAxes, fontsize=10,
-            verticalalignment='top', horizontalalignment='right', bbox=props)
+            verticalalignment='top', horizontalalignment='right', bbox=props, fontproperties=font_prop)
     
     plt.tight_layout()
     

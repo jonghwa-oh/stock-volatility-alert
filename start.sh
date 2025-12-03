@@ -12,6 +12,21 @@ log "=================================="
 log "🔧 DEBUG_MODE: ${DEBUG_MODE:-false}"
 log "=================================="
 
+# 0. matplotlib 캐시 삭제 및 폰트 확인
+log ""
+log "🔧 폰트 설정 초기화..."
+rm -rf /root/.cache/matplotlib 2>/dev/null
+rm -rf ~/.cache/matplotlib 2>/dev/null
+
+# 폰트 확인
+FONT_PATH=$(fc-list | grep -i nanum | head -1 | cut -d: -f1)
+if [ -n "$FONT_PATH" ]; then
+    log "✅ 나눔 폰트 발견: $FONT_PATH"
+else
+    log "⚠️ 나눔 폰트를 찾지 못했습니다"
+    fc-list | head -5
+fi
+
 # 1. DB 데이터 확인
 log "📊 데이터 확인 중..."
 DATA_COUNT=$(python -c "
