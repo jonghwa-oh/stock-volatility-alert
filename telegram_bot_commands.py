@@ -38,19 +38,21 @@ class TelegramBotCommandHandler:
         
         # 사용자 확인
         users = self.db.get_all_users()
-        is_registered = any(u['chat_id'] == str(chat_id) for u in users)
+        registered_user = next((u for u in users if u['chat_id'] == str(chat_id)), None)
         
         message = f"👋 안녕하세요, {user.first_name}님!\n\n"
         message += "📊 주식 변동성 알림 봇입니다.\n\n"
         
-        if is_registered:
-            message += "✅ 등록된 사용자입니다!\n\n"
+        if registered_user:
+            message += f"✅ 등록된 사용자입니다! ({registered_user['name']})\n\n"
         else:
-            message += "❌ 등록되지 않은 사용자입니다.\n"
-            message += f"💡 관리자에게 Chat ID를 알려주세요: `{chat_id}`\n\n"
+            message += "❌ 아직 등록되지 않았습니다.\n"
+            message += "👉 /register 이름 투자금 으로 등록하세요!\n"
+            message += f"   예) /register 홍길동 3000000\n\n"
         
         message += "📝 사용 가능한 명령어:\n"
         message += "/help - 도움말\n"
+        message += "/register - 사용자 등록\n"
         message += "/list - 내 종목 목록\n"
         message += "/add TICKER - 종목 추가\n"
         message += "/remove TICKER - 종목 삭제\n"
@@ -60,13 +62,17 @@ class TelegramBotCommandHandler:
         message += "/alarm_off - 알림 끄기\n"
         message += "/alarm_status - 알림 상태"
         
-        await update.message.reply_text(message, parse_mode='Markdown')
+        await update.message.reply_text(message)
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         /help - 도움말
         """
         message = "📖 명령어 도움말\n\n"
+        
+        message += "👤 사용자 등록:\n"
+        message += "/register 이름 투자금 - 사용자 등록\n"
+        message += "   예) /register 홍길동 3000000\n\n"
         
         message += "📝 종목 관리:\n"
         message += "/list - 내 관심 종목 목록 보기\n"
@@ -95,6 +101,100 @@ class TelegramBotCommandHandler:
         message += "• 잠잘 때는 /alarm_off로 알림을 끌 수 있습니다."
         
         await update.message.reply_text(message)
+    
+    async def register_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /register 이름 투자금 - 새 사용자 등록
+        """
+        try:
+            log(f"📥 /register 명령 수신 - Chat ID: {update.effective_chat.id}")
+            chat_id = str(update.effective_chat.id)
+            telegram_user = update.effective_user
+            
+            # 이미 등록된 사용자인지 확인
+            users = self.db.get_all_users()
+            existing_user = next((u for u in users if u['chat_id'] == chat_id), None)
+            
+            if existing_user:
+                await update.message.reply_text(
+                    f"✅ 이미 등록되어 있습니다!\n\n"
+                    f"👤 이름: {existing_user['name']}\n"
+                    f"💰 투자금: {int(existing_user['investment_amount']):,}원\n\n"
+                    f"종목을 추가하려면 /add TICKER 를 사용하세요."
+                )
+                return
+            
+            # 인자 확인
+            if not context.args or len(context.args) < 2:
+                await update.message.reply_text(
+                    "❌ 사용법이 올바르지 않습니다.\n\n"
+                    "📝 사용법: /register 이름 투자금\n"
+                    "   예) /register 홍길동 3000000\n"
+                    "   예) /register Alice 5000000\n\n"
+                    "💡 투자금은 숫자만 입력하세요 (원 단위)"
+                )
+                return
+            
+            name = context.args[0]
+            
+            # 투자금 파싱
+            try:
+                investment_str = context.args[1].replace(',', '').replace('원', '')
+                investment_amount = int(investment_str)
+                
+                if investment_amount <= 0:
+                    raise ValueError("투자금은 0보다 커야 합니다")
+                    
+            except ValueError as e:
+                await update.message.reply_text(
+                    f"❌ 투자금이 올바르지 않습니다: {context.args[1]}\n\n"
+                    "💡 숫자만 입력하세요 (원 단위)\n"
+                    "   예) 3000000\n"
+                    "   예) 5,000,000"
+                )
+                return
+            
+            # 이름 중복 확인
+            existing_name = next((u for u in users if u['name'] == name), None)
+            if existing_name:
+                await update.message.reply_text(
+                    f"❌ '{name}' 이름이 이미 사용 중입니다.\n\n"
+                    "다른 이름을 사용해주세요."
+                )
+                return
+            
+            # DB에 사용자 추가
+            conn = self.db.connect()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO users (name, chat_id, investment_amount, enabled, notification_enabled)
+                VALUES (?, ?, ?, 1, 1)
+            ''', (name, chat_id, investment_amount))
+            
+            conn.commit()
+            self.db.close()
+            
+            log_success(f"새 사용자 등록: {name} (chat_id: {chat_id}, 투자금: {investment_amount:,})")
+            
+            await update.message.reply_text(
+                f"🎉 환영합니다, {name}님!\n\n"
+                f"✅ 등록이 완료되었습니다.\n\n"
+                f"👤 이름: {name}\n"
+                f"💰 투자금: {investment_amount:,}원\n\n"
+                f"📊 다음 단계:\n"
+                f"1. /add TQQQ - 관심 종목 추가\n"
+                f"2. /morning - 아침 분석 받기\n"
+                f"3. /help - 전체 명령어 보기"
+            )
+            
+        except Exception as e:
+            error_msg = f"❌ 등록 실패: {str(e)}\n\n"
+            error_msg += "🔍 오류 상세:\n"
+            error_msg += f"```\n{traceback.format_exc()[:500]}\n```"
+            log_error(f"/register 명령 실패: {e}")
+            traceback.print_exc()
+            await update.message.reply_text(error_msg)
     
     async def list_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -155,7 +255,12 @@ class TelegramBotCommandHandler:
             log_error(f"/list 명령 실패: {e}")
             import traceback
             traceback.print_exc()
-            await update.message.reply_text(f"❌ 오류 발생: {str(e)}")
+            error_msg = f"❌ /list 명령 실패\n\n"
+            error_msg += f"🔍 오류: {str(e)}\n\n"
+            error_msg += "💡 해결 방법:\n"
+            error_msg += "1. /register 로 먼저 등록했는지 확인\n"
+            error_msg += "2. 문제가 지속되면 관리자에게 문의"
+            await update.message.reply_text(error_msg)
     
     async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -249,10 +354,16 @@ class TelegramBotCommandHandler:
             )
             
         except Exception as e:
-            await update.message.reply_text(
-                f"❌ 종목 추가 실패: {str(e)}\n\n"
-                "티커가 올바른지 확인해주세요."
-            )
+            log_error(f"/add 명령 실패 ({ticker}): {e}")
+            traceback.print_exc()
+            error_msg = f"❌ 종목 추가 실패\n\n"
+            error_msg += f"📌 티커: {ticker}\n"
+            error_msg += f"🔍 오류: {str(e)}\n\n"
+            error_msg += "💡 확인 사항:\n"
+            error_msg += "• 한국 주식: 6자리 숫자 (예: 122630)\n"
+            error_msg += "• 미국 주식: 영문 심볼 (예: TQQQ, AAPL)\n"
+            error_msg += "• 티커가 올바른지 확인해주세요"
+            await update.message.reply_text(error_msg)
     
     async def remove_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -694,6 +805,7 @@ class TelegramBotCommandHandler:
         # 커맨드 핸들러 등록
         application.add_handler(CommandHandler("start", self.start_command))
         application.add_handler(CommandHandler("help", self.help_command))
+        application.add_handler(CommandHandler("register", self.register_command))
         application.add_handler(CommandHandler("list", self.list_command))
         application.add_handler(CommandHandler("add", self.add_command))
         application.add_handler(CommandHandler("remove", self.remove_command))
@@ -707,6 +819,7 @@ class TelegramBotCommandHandler:
         log_success("커맨드 핸들러 등록 완료:")
         log("   - /start: 봇 시작")
         log("   - /help: 도움말")
+        log("   - /register: 사용자 등록")
         log("   - /list: 종목 목록")
         log("   - /add: 종목 추가")
         log("   - /remove: 종목 삭제")

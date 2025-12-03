@@ -74,10 +74,13 @@ def import_settings(input_file='settings_backup.json', force=False):
         # 2. users 테이블
         print("\n👤 users 테이블 가져오기...")
         for user in import_data['users']:
+            # notification_enabled는 기본값 True (이전 버전 호환)
+            notification_enabled = user.get('notification_enabled', True)
             cursor.execute('''
-                INSERT OR REPLACE INTO users (name, chat_id, investment_amount, enabled)
-                VALUES (?, ?, ?, ?)
-            ''', (user['name'], user['chat_id'], user['investment_amount'], user['enabled']))
+                INSERT OR REPLACE INTO users (name, chat_id, investment_amount, enabled, notification_enabled)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (user['name'], user['chat_id'], user['investment_amount'], user['enabled'], notification_enabled))
+            print(f"    - {user['name']}: chat_id={user['chat_id']}, enabled={user['enabled']}")
         print(f"  ✅ {len(import_data['users'])}명 사용자 저장")
         
         # 3. user_watchlist 테이블

@@ -50,13 +50,14 @@ def export_settings(output_file='settings_backup.json'):
     
     # 3. users 테이블
     print("\n👤 users 테이블 내보내기...")
-    cursor.execute('SELECT name, chat_id, investment_amount, enabled FROM users')
+    cursor.execute('SELECT name, chat_id, investment_amount, enabled, notification_enabled FROM users')
     for row in cursor.fetchall():
         export_data['users'].append({
             'name': row[0],
             'chat_id': row[1],
             'investment_amount': row[2],
-            'enabled': bool(row[3])
+            'enabled': bool(row[3]),
+            'notification_enabled': bool(row[4]) if row[4] is not None else True
         })
     print(f"  ✅ {len(export_data['users'])}명 사용자")
     
