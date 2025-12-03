@@ -11,8 +11,6 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     procps \
     fonts-nanum \
-    fonts-nanum-coding \
-    fonts-nanum-extra \
     fontconfig \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -fv \
