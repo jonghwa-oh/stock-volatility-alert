@@ -8,7 +8,7 @@ from pathlib import Path
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from database import StockDatabase
-from daily_analysis import send_daily_alerts, analyze_and_generate_charts
+from daily_analysis import send_daily_alerts, analyze_and_generate_charts, get_stock_name
 from volatility_analysis import analyze_daily_volatility
 from config import load_config
 from kis_api import KISApi
@@ -466,12 +466,9 @@ class TelegramBotCommandHandler:
             log_debug("4️⃣ 차트 전송 시작...")
             for stock in watchlist:
                 ticker = stock['ticker']
-                name = stock['name']
                 
-                # 종목명이 티커와 같으면 분석 결과에서 이름 가져오기
-                result = analysis_results.get(ticker)
-                if result and result.get('name') and result['name'] != ticker:
-                    name = result['name']
+                # 종목명 가져오기 (KIS API 활용)
+                name = get_stock_name(ticker, stock['name'])
                 
                 log_debug(f"   [{ticker}] 처리 중... (이름: {name})")
                 
