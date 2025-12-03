@@ -154,6 +154,20 @@ class TelegramBotCommandHandler:
                 )
                 return
             
+            # chat_id 중복 확인 (이미 등록된 사용자인지)
+            existing_chat = next((u for u in users if str(u['chat_id']) == chat_id), None)
+            if existing_chat:
+                await update.message.reply_text(
+                    f"✅ 이미 등록되어 있습니다!\n\n"
+                    f"👤 이름: {existing_chat['name']}\n"
+                    f"💰 투자금: {int(existing_chat['investment_amount']):,}원\n\n"
+                    f"📊 사용 가능한 명령어:\n"
+                    f"/list - 관심 종목 보기\n"
+                    f"/add TQQQ - 종목 추가\n"
+                    f"/morning - 아침 분석 받기"
+                )
+                return
+            
             # 이름 중복 확인
             existing_name = next((u for u in users if u['name'] == name), None)
             if existing_name:
