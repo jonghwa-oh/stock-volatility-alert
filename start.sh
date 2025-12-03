@@ -57,6 +57,38 @@ else
     log "✅ 데이터 있음 (수집 건너뛰기)"
 fi
 
+# 2.5 등록된 사용자 및 종목 정보 출력
+log ""
+log "=================================="
+log "👥 등록된 사용자 및 관심 종목"
+log "=================================="
+python -c "
+from database import StockDatabase
+db = StockDatabase()
+
+users = db.get_all_users()
+print(f'📊 총 {len(users)}명의 사용자')
+print('')
+
+for user in users:
+    name = user['name']
+    enabled = '✅' if user['enabled'] else '❌'
+    notif = '🔔' if user.get('notification_enabled', 1) else '🔕'
+    invest = int(user['investment_amount'])
+    print(f'{enabled} {name} ({notif} 알림) - 투자금: {invest:,}원')
+    
+    # 관심 종목
+    watchlist = db.get_user_watchlist_with_names(name)
+    if watchlist:
+        tickers = ', '.join([s['ticker'] for s in watchlist])
+        print(f'   └─ 관심 종목 ({len(watchlist)}개): {tickers}')
+    else:
+        print(f'   └─ 관심 종목: 없음')
+    print('')
+
+db.close()
+"
+
 # 3. 일일 업데이트 스케줄러 백그라운드 실행
 log ""
 log "=================================="
