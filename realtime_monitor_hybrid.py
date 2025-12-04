@@ -399,13 +399,12 @@ class HybridRealtimeMonitor:
                 try:
                     current_price = None
                     
-                    # 1순위: KIS API
+                    # 1순위: KIS API (자동 거래소 감지)
                     if kis_api:
                         try:
-                            exchange = kis_api.get_exchange_code(ticker)
-                            price_info = kis_api.get_overseas_stock_price(ticker, exchange)
+                            price_info = kis_api.get_overseas_stock_price_auto(ticker)
                             if price_info:
-                                current_price = price_info['current_price']
+                                current_price = price_info.get('current_price', 0)
                         except Exception as e:
                             log_warning(f"KIS API 오류 ({ticker}): {e}")
                     
