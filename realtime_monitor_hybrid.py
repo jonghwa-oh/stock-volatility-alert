@@ -155,24 +155,36 @@ class HybridRealtimeMonitor:
             current_price: 현재가
         """
         if ticker not in self.target_prices:
+            log_debug(f"  [{ticker}] target_prices에 없음 (건너뜀)")
             return
         
         targets = self.target_prices[ticker]
         name = targets['name']
+        country = targets.get('country', 'US')
         
         # 알림 시간 체크
         is_alert_time = self._is_alert_time()
         
+        # 가격 비교 로그 (DEBUG 모드일 때만)
+        if self.debug_mode:
+            if country == 'KR':
+                log_debug(f"  [{ticker}] 현재가: {current_price:,.0f}원 | 0.5σ: {targets['05x']:,.0f}원 | 1σ: {targets['1x']:,.0f}원 | 2σ: {targets['2x']:,.0f}원")
+            else:
+                log_debug(f"  [{ticker}] 현재가: ${current_price:,.2f} | 0.5σ: ${targets['05x']:,.2f} | 1σ: ${targets['1x']:,.2f} | 2σ: ${targets['2x']:,.2f}")
+        
         # 테스트 매수 목표가 도달 확인 (0.5x)
         if current_price <= targets['05x']:
+            log(f"  🎯 [{ticker}] 0.5σ 목표가 도달! 현재가: {current_price}, 목표가: {targets['05x']}")
             await self._send_buy_alert(ticker, name, current_price, '05x', targets, send_now=is_alert_time)
         
         # 1차 매수 목표가 도달 확인
         if current_price <= targets['1x']:
+            log(f"  🎯 [{ticker}] 1σ 목표가 도달! 현재가: {current_price}, 목표가: {targets['1x']}")
             await self._send_buy_alert(ticker, name, current_price, '1x', targets, send_now=is_alert_time)
         
         # 2차 매수 목표가 도달 확인
         if current_price <= targets['2x']:
+            log(f"  🎯 [{ticker}] 2σ 목표가 도달! 현재가: {current_price}, 목표가: {targets['2x']}")
             await self._send_buy_alert(ticker, name, current_price, '2x', targets, send_now=is_alert_time)
     
     async def _send_buy_alert(self, ticker: str, name: str, current_price: float, level: str, targets: dict, send_now: bool = True):
@@ -182,11 +194,14 @@ class HybridRealtimeMonitor:
         Args:
             send_now: True면 즉시 전송, False면 DB에만 기록
         """
+        log_debug(f"  📤 [{ticker}] _send_buy_alert 호출됨 (level={level}, send_now={send_now})")
+        
         # 중복 알림 방지 (5분 내 동일 레벨 알림 방지)
         now = datetime.now()
         if ticker in self.alert_history:
             last_alert = self.alert_history[ticker].get(level)
             if last_alert and (now - last_alert).seconds < 300:  # 5분
+                log_debug(f"  ⏭️ [{ticker}] 중복 알림 방지 (5분 내 동일 레벨)")
                 return
         
         # 알림 메시지 구성
@@ -237,18 +252,23 @@ class HybridRealtimeMonitor:
         conn.commit()
         
         # 알림 전송 (알림 시간일 때만)
+        log_debug(f"  📤 [{ticker}] DB 기록 완료, send_now={send_now}")
+        
         if send_now:
             users = self.db.get_all_users()
+            log_debug(f"  📤 [{ticker}] 전체 사용자 수: {len(users)}")
             
+            sent_to_users = []
             for user in users:
                 # 사용자 활성화 체크
                 if not user['enabled']:
+                    log_debug(f"  ⏭️ [{ticker}] {user['name']} - 사용자 비활성화 (건너뜀)")
                     continue
                 
                 # 알림 활성화 체크
                 notification_enabled = user.get('notification_enabled', 1)
                 if not notification_enabled:
-                    print(f"  ⏸️  {user['name']} - 알림 비활성화 상태 (건너뜀)")
+                    log(f"  ⏸️ [{ticker}] {user['name']} - 알림 비활성화 상태 (건너뜀)")
                     continue
                 
                 # 해당 사용자가 이 종목을 관심 종목으로 가지고 있는지 확인
@@ -257,24 +277,31 @@ class HybridRealtimeMonitor:
                     WHERE user_id = ? AND ticker = ? AND enabled = 1
                 ''', (user['id'], ticker))
                 
-                if cursor.fetchone()[0] == 0:
+                watchlist_count = cursor.fetchone()[0]
+                if watchlist_count == 0:
+                    log_debug(f"  ⏭️ [{ticker}] {user['name']} - 관심 종목 아님 (건너뜀)")
                     continue
                 
                 try:
+                    log_debug(f"  📤 [{ticker}] {user['name']}님에게 알림 전송 시도...")
                     send_telegram_sync(
                         self.telegram_config['BOT_TOKEN'],
                         user['chat_id'],
                         message=message
                     )
-                    print(f"  ✅ {user['name']}님에게 {level_text} 매수 알림 전송")
+                    log_success(f"  ✅ [{ticker}] {user['name']}님에게 {level_text} 매수 알림 전송 완료!")
+                    sent_to_users.append(user['name'])
                     
                 except Exception as e:
-                    print(f"  ❌ {user['name']}님 알림 전송 실패: {e}")
+                    log_error(f"  ❌ [{ticker}] {user['name']}님 알림 전송 실패: {e}")
             
-            print(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송")
+            if sent_to_users:
+                log(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송 완료: {', '.join(sent_to_users)}")
+            else:
+                log_warning(f"⚠️ {name} ({ticker}) {level_text} - 알림 대상 사용자 없음")
         else:
             # 알림 시간 외에는 DB에만 기록
-            print(f"💾 {name} ({ticker}) {level_text} 매수 시점 기록 (알림 시간 외: {now.strftime('%H:%M:%S')})")
+            log(f"💾 {name} ({ticker}) {level_text} 매수 시점 기록 (알림 시간 외: {now.strftime('%H:%M:%S')})")
         
         # 알림 이력 기록 (중복 방지용)
         if ticker not in self.alert_history:
