@@ -267,10 +267,11 @@ class TelegramBotCommandHandler:
             for idx, stock in enumerate(watchlist, 1):
                 ticker = stock['ticker']
                 name = stock['name']
-                country = stock['country']
+                country = stock.get('country', 'US')
                 flag = '🇰🇷' if country == 'KR' else '🇺🇸'
                 
-                if ticker.isdigit():
+                # 한국 종목은 이름(티커), 미국 종목은 티커 - 이름
+                if country == 'KR':
                     message += f"{idx}. {flag} {name} ({ticker})\n"
                 else:
                     message += f"{idx}. {flag} {ticker} - {name}\n"
@@ -295,7 +296,7 @@ class TelegramBotCommandHandler:
     
     async def add_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        /add TICKER - 종목 추가
+        /add TICKER 또는 /add KR/US TICKER - 종목 추가
         """
         chat_id = str(update.effective_chat.id)
         
@@ -303,13 +304,25 @@ class TelegramBotCommandHandler:
         if not context.args or len(context.args) < 1:
             await update.message.reply_text(
                 "❌ 티커를 입력해주세요.\n\n"
-                "사용법: /add TICKER\n"
+                "📝 사용법:\n"
+                "• /add TICKER - 자동 판별\n"
+                "• /add KR TICKER - 한국 주식\n"
+                "• /add US TICKER - 미국 주식\n\n"
                 "예) /add TQQQ\n"
-                "예) /add 122630"
+                "예) /add 122630\n"
+                "예) /add KR 122630\n"
+                "예) /add US AAPL"
             )
             return
         
-        ticker = context.args[0].upper()
+        # 국가와 티커 파싱
+        if len(context.args) >= 2 and context.args[0].upper() in ['KR', 'US']:
+            country = context.args[0].upper()
+            ticker = context.args[1].upper()
+        else:
+            ticker = context.args[0].upper()
+            # 자동 판별 (숫자만 있으면 한국, 아니면 미국)
+            country = 'KR' if ticker.isdigit() else 'US'
         
         # 사용자 찾기
         users = self.db.get_all_users()
@@ -330,12 +343,11 @@ class TelegramBotCommandHandler:
             return
         
         # 종목 정보 가져오기
-        await update.message.reply_text(f"🔍 {ticker} 정보를 확인 중...")
+        flag = '🇰🇷' if country == 'KR' else '🇺🇸'
+        await update.message.reply_text(f"🔍 {flag} {ticker} 정보를 확인 중...")
         
         try:
-            # 한국 주식인지 미국 주식인지 판별
-            is_korean = ticker.isdigit()
-            country = 'KR' if is_korean else 'US'
+            is_korean = (country == 'KR')
             
             # 티커 이름 가져오기
             if is_korean:
@@ -497,11 +509,12 @@ class TelegramBotCommandHandler:
             log_debug("4️⃣ 차트 전송 시작...")
             for stock in watchlist:
                 ticker = stock['ticker']
+                country = stock.get('country', 'US')  # 기본값 US
                 
                 # 종목명 가져오기 (KIS API 활용)
-                name = get_stock_name(ticker, stock['name'])
+                name = get_stock_name(ticker, stock['name'], country)
                 
-                log_debug(f"   [{ticker}] 처리 중... (이름: {name})")
+                log_debug(f"   [{ticker}] [{country}] 처리 중... (이름: {name})")
                 
                 # 분석 결과 가져오기 (analysis_results는 딕셔너리)
                 result = analysis_results.get(ticker)
@@ -522,8 +535,8 @@ class TelegramBotCommandHandler:
                 
                 log_debug(f"   [{ticker}] 차트 존재 확인 ✓")
                 
-                # 통화 단위 결정
-                is_korean = ticker.isdigit()
+                # 통화 단위 결정 (country로 판단)
+                is_korean = (country == 'KR')
                 invest_str = f"{int(user['investment_amount']):,}원"
                 
                 # 분석 데이터가 있으면 메시지 생성

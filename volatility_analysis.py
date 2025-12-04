@@ -136,13 +136,16 @@ def get_font_properties():
 setup_korean_font()
 
 
-def get_stock_name_from_api(ticker: str) -> str:
+def get_stock_name_from_api(ticker: str, country: str = None) -> str:
     """KIS API에서 종목명을 가져옵니다."""
     try:
         from kis_api import KISApi
         kis = KISApi()
         
-        if ticker.isdigit():  # 한국 주식
+        # country가 주어지면 사용, 아니면 숫자 여부로 fallback
+        is_korean = (country == 'KR') if country else ticker.isdigit()
+        
+        if is_korean:  # 한국 주식
             price_data = kis.get_stock_price(ticker)
         else:  # 미국 주식
             price_data = kis.get_overseas_stock_price(ticker)
@@ -155,7 +158,7 @@ def get_stock_name_from_api(ticker: str) -> str:
     return ticker
 
 
-def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
+def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, country='KR'):
     """
     일일 변동성 분석
     
@@ -163,9 +166,10 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
         ticker: 종목 코드
         ticker_name: 종목명
         investment_amount: 투자 금액
+        country: 국가 코드 ('KR' 또는 'US')
     """
-    # 국가 판별 (한국: 숫자 티커, 미국: 알파벳 티커)
-    is_korean = ticker.isdigit()
+    # 국가 판별 (country 파라미터 사용)
+    is_korean = (country == 'KR')
     currency = "원" if is_korean else "$"
     
     # 종목명이 티커와 같으면 KIS API에서 조회
@@ -307,6 +311,8 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000):
     return {
         'ticker': ticker,
         'ticker_name': ticker_name,
+        'country': country,
+        'is_korean': is_korean,
         'close_prices': close_prices,
         'daily_returns': daily_returns,
         'current_price': current_price,
@@ -348,7 +354,8 @@ def visualize_volatility(data):
     ticker = data['ticker']
     
     # 차트 제목용: 한국 종목은 이름(티커), 미국 종목은 티커 - 이름
-    is_korean = ticker.isdigit()
+    # country 정보가 있으면 사용, 없으면 fallback
+    is_korean = data.get('is_korean', data.get('country') == 'KR')
     if is_korean:
         chart_title = f"{ticker_name} ({ticker})"
         currency = "원"
