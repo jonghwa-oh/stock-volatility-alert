@@ -58,11 +58,11 @@ class TelegramBotCommandHandler:
         message += "/remove TICKER - 종목 삭제\n"
         message += "/morning - 아침 알림 받기\n"
         message += "/status - 실시간 현재가 확인\n"
-        message += "/alarm_on - 알림 켜기\n"
-        message += "/alarm_off - 알림 끄기\n"
-        message += "/alarm_status - 알림 상태\n"
-        message += "/check TICKER - 실시간 알림 조건 확인\n"
-        message += "/test TICKER - 테스트 알림 전송"
+        message += "/on - 알림 켜기\n"
+        message += "/off - 알림 끄기\n"
+        message += "/alarm - 알림 상태\n"
+        message += "/c TICKER - 실시간 알림 조건 확인\n"
+        message += "/t TICKER - 테스트 알림 전송"
         
         await update.message.reply_text(message)
     
@@ -91,15 +91,15 @@ class TelegramBotCommandHandler:
         message += "   예) /status TQQQ\n\n"
         
         message += "🔔 알림 설정:\n"
-        message += "/alarm_on - 알림 켜기\n"
-        message += "/alarm_off - 알림 끄기\n"
-        message += "/alarm_status - 알림 상태 확인\n\n"
+        message += "/on - 알림 켜기\n"
+        message += "/off - 알림 끄기\n"
+        message += "/alarm - 알림 상태 확인\n\n"
         
         message += "🧪 실시간 알림 테스트:\n"
-        message += "/check TICKER - 알림 조건 확인\n"
-        message += "   예) /check TQQQ\n"
-        message += "/test TICKER - 테스트 알림 전송\n"
-        message += "   예) /test 122630\n\n"
+        message += "/c TICKER - 알림 조건 확인\n"
+        message += "   예) /c TQQQ\n"
+        message += "/t TICKER - 테스트 알림 전송\n"
+        message += "   예) /t 122630\n\n"
         
         message += "💡 Tips:\n"
         message += "• 한국 주식: 티커 번호 (예: 122630)\n"
@@ -717,9 +717,9 @@ class TelegramBotCommandHandler:
     
     async def alarm_on_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        /alarm_on - 알림 켜기
+        /on - 알림 켜기
         """
-        log(f"📥 /alarm_on 명령 수신 - Chat ID: {update.effective_chat.id}")
+        log(f"📥 /on 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
         # 사용자 찾기
@@ -753,9 +753,9 @@ class TelegramBotCommandHandler:
     
     async def alarm_off_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        /alarm_off - 알림 끄기
+        /off - 알림 끄기
         """
-        log(f"📥 /alarm_off 명령 수신 - Chat ID: {update.effective_chat.id}")
+        log(f"📥 /off 명령 수신 - Chat ID: {update.effective_chat.id}")
         chat_id = str(update.effective_chat.id)
         
         # 사용자 찾기
@@ -784,16 +784,16 @@ class TelegramBotCommandHandler:
         await update.message.reply_text(
             "🔕 알림이 비활성화되었습니다.\n\n"
             "실시간 매수 타이밍 알림을 받지 않습니다.\n"
-            "다시 켜려면 /alarm_on 을 입력하세요."
+            "다시 켜려면 /on 을 입력하세요."
         )
         log_success(f"사용자 {user['name']} 알림 비활성화")
     
     async def alarm_status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
-        /alarm_status - 알림 상태 확인
+        /alarm - 알림 상태 확인
         """
         try:
-            log(f"📥 /alarm_status 명령 수신 - Chat ID: {update.effective_chat.id}")
+            log(f"📥 /alarm 명령 수신 - Chat ID: {update.effective_chat.id}")
             chat_id = str(update.effective_chat.id)
             
             # 사용자 찾기
@@ -821,11 +821,11 @@ class TelegramBotCommandHandler:
             if notification_enabled:
                 status_icon = "🔔"
                 status_text = "활성화"
-                action_text = "끄려면 /alarm_off 를 입력하세요."
+                action_text = "끄려면 /off 를 입력하세요."
             else:
                 status_icon = "🔕"
                 status_text = "비활성화"
-                action_text = "켜려면 /alarm_on 을 입력하세요."
+                action_text = "켜려면 /on 을 입력하세요."
             
             message = f"{status_icon} 알림 상태: {status_text}\n\n"
             message += f"📊 관심 종목: {watchlist_count}개\n"
@@ -833,10 +833,10 @@ class TelegramBotCommandHandler:
             message += action_text
             
             await update.message.reply_text(message)
-            log_success(f"/alarm_status 명령 완료 - {user['name']}")
+            log_success(f"/alarm 명령 완료 - {user['name']}")
             
         except Exception as e:
-            log_error(f"/alarm_status 명령 실패: {e}")
+            log_error(f"/alarm 명령 실패: {e}")
             import traceback
             traceback.print_exc()
             await update.message.reply_text(f"❌ 오류 발생: {str(e)}")
@@ -1043,13 +1043,13 @@ class TelegramBotCommandHandler:
         application.add_handler(CommandHandler("remove", self.remove_command))
         application.add_handler(CommandHandler("morning", self.morning_command))
         application.add_handler(CommandHandler("status", self.status_command))
-        application.add_handler(CommandHandler("alarm_on", self.alarm_on_command))
-        application.add_handler(CommandHandler("alarm_off", self.alarm_off_command))
-        application.add_handler(CommandHandler("alarm_status", self.alarm_status_command))
-        application.add_handler(CommandHandler("check", self.check_command))
-        application.add_handler(CommandHandler("c", self.check_command))  # 단축키
-        application.add_handler(CommandHandler("test", self.test_command))
-        application.add_handler(CommandHandler("t", self.test_command))  # 단축키
+        application.add_handler(CommandHandler("on", self.alarm_on_command))
+        application.add_handler(CommandHandler("off", self.alarm_off_command))
+        application.add_handler(CommandHandler("alarm", self.alarm_status_command))
+        application.add_handler(CommandHandler("c", self.check_command))
+        application.add_handler(CommandHandler("check", self.check_command))  # 긴 버전
+        application.add_handler(CommandHandler("t", self.test_command))
+        application.add_handler(CommandHandler("test", self.test_command))  # 긴 버전
         
         log("")
         log_success("커맨드 핸들러 등록 완료:")
@@ -1061,11 +1061,11 @@ class TelegramBotCommandHandler:
         log("   - /remove: 종목 삭제")
         log("   - /morning: 아침 알림")
         log("   - /status: 현재가 확인")
-        log("   - /alarm_on: 알림 켜기")
-        log("   - /alarm_off: 알림 끄기")
-        log("   - /alarm_status: 알림 상태")
-        log("   - /check (/c): 알림 조건 확인")
-        log("   - /test (/t): 테스트 알림")
+        log("   - /on: 알림 켜기")
+        log("   - /off: 알림 끄기")
+        log("   - /alarm: 알림 상태")
+        log("   - /c (/check): 알림 조건 확인")
+        log("   - /t (/test): 테스트 알림")
         
         log("")
         log("🚀 봇 시작... (Ctrl+C로 종료)")

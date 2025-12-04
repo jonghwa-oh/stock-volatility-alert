@@ -26,14 +26,13 @@ def send_photo(chat_id, photo_path, caption=None):
     send_telegram_sync(TELEGRAM_CONFIG['BOT_TOKEN'], chat_id, message=message, photo_path=photo_path)
 
 
-def get_stock_name(ticker: str, fallback_name: str, country: str = None) -> str:
+def get_stock_name(ticker: str, fallback_name: str) -> str:
     """
     종목명 가져오기 (티커와 이름이 같으면 KIS API에서 조회)
     
     Args:
         ticker: 종목 코드
         fallback_name: 기본 이름 (DB에서 가져온 값)
-        country: 국가 코드 ('KR' 또는 'US')
     
     Returns:
         종목명
@@ -42,10 +41,8 @@ def get_stock_name(ticker: str, fallback_name: str, country: str = None) -> str:
     if fallback_name and fallback_name != ticker:
         return fallback_name
     
-    # country로 판단 (없으면 숫자 여부로 fallback)
-    is_korean = (country == 'KR') if country else ticker.isdigit()
-    
-    if is_korean:
+    # 한국 주식인 경우 KIS API에서 종목명 조회
+    if ticker.isdigit():
         try:
             kis = KISApi()
             price_data = kis.get_stock_price(ticker)
@@ -67,13 +64,13 @@ def get_stock_name(ticker: str, fallback_name: str, country: str = None) -> str:
 
 
 def get_unique_tickers():
-    """모든 사용자의 종목을 중복 없이 가져오기 (country 포함)"""
+    """모든 사용자의 종목을 중복 없이 가져오기"""
     db = StockDatabase()
     
     # 활성 사용자와 종목 가져오기
     users = db.get_all_users()
     
-    unique_tickers = {}  # {ticker: {'name': name, 'country': country}}
+    unique_tickers = {}  # {ticker: name}
     for user in users:
         if not user['enabled']:
             continue
@@ -82,10 +79,9 @@ def get_unique_tickers():
         watchlist = db.get_user_watchlist_with_names(user['name'])
         for stock in watchlist:
             ticker = stock['ticker']
-            country = stock.get('country', 'US')  # 기본값 US
             # 종목명이 없거나 티커와 같으면 KIS API에서 가져오기
-            name = get_stock_name(ticker, stock['name'], country)
-            unique_tickers[ticker] = {'name': name, 'country': country}
+            name = get_stock_name(ticker, stock['name'])
+            unique_tickers[ticker] = name
     
     db.close()
     return unique_tickers
@@ -110,18 +106,15 @@ def analyze_and_generate_charts():
     
     results = {}
     
-    for ticker, stock_info in unique_tickers.items():
-        name = stock_info['name']
-        country = stock_info['country']
-        
-        print(f"\n📊 {ticker} ({name}) [{country}] 분석 중...")
+    for ticker, name in unique_tickers.items():
+        print(f"\n📊 {ticker} ({name}) 분석 중...")
         
         # 차트 파일 경로
         chart_path = Path('charts') / ticker / f"{today}_{ticker}_{name.replace(' ', '_')}_volatility.png"
         
         # 분석 수행 (매수 목표가 계산 위해 항상 수행)
         try:
-            data = analyze_daily_volatility(ticker, name, country=country)
+            data = analyze_daily_volatility(ticker, name)
             if not data:
                 print(f"  ❌ 분석 실패")
                 continue
@@ -136,7 +129,6 @@ def analyze_and_generate_charts():
             
             results[ticker] = {
                 'name': name,
-                'country': country,
                 'chart_path': chart_file,
                 'data': data  # 매수 목표가 계산을 위해 항상 저장
             }
