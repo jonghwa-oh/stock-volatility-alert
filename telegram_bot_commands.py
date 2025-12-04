@@ -60,7 +60,9 @@ class TelegramBotCommandHandler:
         message += "/status - 실시간 현재가 확인\n"
         message += "/alarm_on - 알림 켜기\n"
         message += "/alarm_off - 알림 끄기\n"
-        message += "/alarm_status - 알림 상태"
+        message += "/alarm_status - 알림 상태\n"
+        message += "/check TICKER - 실시간 알림 조건 확인\n"
+        message += "/test TICKER - 테스트 알림 전송"
         
         await update.message.reply_text(message)
     
@@ -92,6 +94,12 @@ class TelegramBotCommandHandler:
         message += "/alarm_on - 알림 켜기\n"
         message += "/alarm_off - 알림 끄기\n"
         message += "/alarm_status - 알림 상태 확인\n\n"
+        
+        message += "🧪 실시간 알림 테스트:\n"
+        message += "/check TICKER - 알림 조건 확인\n"
+        message += "   예) /check TQQQ\n"
+        message += "/test TICKER - 테스트 알림 전송\n"
+        message += "   예) /test 122630\n\n"
         
         message += "💡 Tips:\n"
         message += "• 한국 주식: 티커 번호 (예: 122630)\n"
@@ -833,6 +841,189 @@ class TelegramBotCommandHandler:
             traceback.print_exc()
             await update.message.reply_text(f"❌ 오류 발생: {str(e)}")
     
+    async def check_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /check TICKER - 실시간 알림 조건 확인
+        현재가와 목표가를 비교하여 알림이 발송될 조건인지 확인
+        """
+        log(f"📥 /check 명령 수신 - Chat ID: {update.effective_chat.id}")
+        
+        if not context.args or len(context.args) < 1:
+            await update.message.reply_text(
+                "❌ 티커를 입력해주세요.\n\n"
+                "📝 사용법: /check TICKER\n"
+                "   예) /check TQQQ\n"
+                "   예) /check 122630"
+            )
+            return
+        
+        ticker = context.args[0].upper()
+        
+        await update.message.reply_text(f"🔍 {ticker} 실시간 알림 조건 확인 중...")
+        
+        try:
+            # 국가 판별
+            country = 'KR' if ticker.isdigit() else 'US'
+            flag = '🇰🇷' if country == 'KR' else '🇺🇸'
+            
+            # 현재가 조회
+            if country == 'KR':
+                price_data = self.kis_api.get_stock_price(ticker)
+            else:
+                price_data = self.kis_api.get_overseas_stock_price(ticker)
+            
+            if not price_data:
+                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패")
+                return
+            
+            current_price = price_data['price']
+            name = price_data.get('name', ticker)
+            
+            # 목표가 계산
+            data = analyze_daily_volatility(ticker, name)
+            
+            if not data:
+                await update.message.reply_text(f"❌ {ticker} 분석 실패 (일봉 데이터 확인 필요)")
+                return
+            
+            # 알림 조건 확인
+            target_05x = data['target_05x']
+            target_1x = data['target_1x']
+            target_2x = data['target_2x']
+            
+            # 상태 이모지 결정
+            def get_status(current, target):
+                if current <= target:
+                    return "🚨 도달!"
+                diff = ((current - target) / target) * 100
+                if diff < 1:
+                    return f"⚠️ 근접 ({diff:.2f}%)"
+                return f"🔵 {diff:.2f}% 남음"
+            
+            status_05x = get_status(current_price, target_05x)
+            status_1x = get_status(current_price, target_1x)
+            status_2x = get_status(current_price, target_2x)
+            
+            # 메시지 구성
+            message = f"🔍 {flag} {name} ({ticker}) 알림 조건\n\n"
+            
+            if country == 'KR':
+                message += f"💰 현재가: {current_price:,.0f}원\n\n"
+                message += f"🧪 0.5σ: {target_05x:,.0f}원 ({data['drop_05x']:.2f}% 하락)\n"
+                message += f"   상태: {status_05x}\n\n"
+                message += f"📊 1σ: {target_1x:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
+                message += f"   상태: {status_1x}\n\n"
+                message += f"📊 2σ: {target_2x:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
+                message += f"   상태: {status_2x}\n"
+            else:
+                message += f"💰 현재가: ${current_price:,.2f}\n\n"
+                message += f"🧪 0.5σ: ${target_05x:,.2f} ({data['drop_05x']:.2f}% 하락)\n"
+                message += f"   상태: {status_05x}\n\n"
+                message += f"📊 1σ: ${target_1x:,.2f} ({data['drop_1x']:.2f}% 하락)\n"
+                message += f"   상태: {status_1x}\n\n"
+                message += f"📊 2σ: ${target_2x:,.2f} ({data['drop_2x']:.2f}% 하락)\n"
+                message += f"   상태: {status_2x}\n"
+            
+            message += f"\n⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+            await update.message.reply_text(message)
+            log_success(f"/check {ticker} 완료")
+            
+        except Exception as e:
+            log_error(f"/check 명령 실패: {e}")
+            traceback.print_exc()
+            await update.message.reply_text(f"❌ 오류: {str(e)}")
+    
+    async def test_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /test TICKER - 테스트 알림 전송
+        현재 가격 기준으로 알림 메시지 형식 미리보기
+        """
+        log(f"📥 /test 명령 수신 - Chat ID: {update.effective_chat.id}")
+        chat_id = str(update.effective_chat.id)
+        
+        if not context.args or len(context.args) < 1:
+            await update.message.reply_text(
+                "❌ 티커를 입력해주세요.\n\n"
+                "📝 사용법: /test TICKER\n"
+                "   예) /test TQQQ\n"
+                "   예) /test 122630"
+            )
+            return
+        
+        ticker = context.args[0].upper()
+        
+        # 사용자 확인
+        users = self.db.get_all_users()
+        user = next((u for u in users if u['chat_id'] == chat_id), None)
+        
+        if not user:
+            await update.message.reply_text(
+                "❌ 등록되지 않은 사용자입니다.\n"
+                f"관리자에게 Chat ID를 알려주세요: `{chat_id}`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        await update.message.reply_text(f"🧪 {ticker} 테스트 알림 생성 중...")
+        
+        try:
+            # 국가 판별
+            country = 'KR' if ticker.isdigit() else 'US'
+            flag = '🇰🇷' if country == 'KR' else '🇺🇸'
+            
+            # 현재가 조회
+            if country == 'KR':
+                price_data = self.kis_api.get_stock_price(ticker)
+            else:
+                price_data = self.kis_api.get_overseas_stock_price(ticker)
+            
+            if not price_data:
+                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패")
+                return
+            
+            current_price = price_data['price']
+            name = price_data.get('name', ticker)
+            
+            # 목표가 계산
+            data = analyze_daily_volatility(ticker, name)
+            
+            if not data:
+                await update.message.reply_text(f"❌ {ticker} 분석 실패 (일봉 데이터 확인 필요)")
+                return
+            
+            # 테스트 알림 메시지 (실제 알림과 동일한 형식)
+            now = datetime.now()
+            
+            if country == 'KR':
+                price_format = f"{current_price:,.0f}원"
+                target_format = f"{data['target_05x']:,.0f}원"
+            else:
+                price_format = f"${current_price:,.2f}"
+                target_format = f"${data['target_05x']:,.2f}"
+            
+            message = f"🧪 테스트 알림 (실제 전송되지 않음)\n\n"
+            message += "━━━━━━━━━━━━━━━━━━\n\n"
+            message += f"🚨 실시간 매수 알림! 🧪 테스트 매수 시점 도달\n\n"
+            message += f"{flag} {name} ({ticker})\n"
+            message += f"💰 현재가: {price_format}\n"
+            message += f"🎯 목표가: {target_format}\n"
+            message += f"📉 하락률: {data['drop_05x']:.2f}%\n\n"
+            message += f"⏰ {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            message += "💡 🧪 테스트 매수 타이밍입니다! (0.5배 투자)\n\n"
+            message += "📊 차트는 오늘 아침 알림을 확인하세요\n\n"
+            message += "━━━━━━━━━━━━━━━━━━\n\n"
+            message += "⬆️ 위와 같은 형식으로 알림이 전송됩니다.\n"
+            message += "현재가가 목표가 이하로 떨어지면 자동 알림!"
+            
+            await update.message.reply_text(message)
+            log_success(f"/test {ticker} 완료")
+            
+        except Exception as e:
+            log_error(f"/test 명령 실패: {e}")
+            traceback.print_exc()
+            await update.message.reply_text(f"❌ 오류: {str(e)}")
+    
     def run(self):
         """봇 실행"""
         log_section("🤖 텔레그램 봇 커맨드 핸들러 시작")
@@ -855,6 +1046,10 @@ class TelegramBotCommandHandler:
         application.add_handler(CommandHandler("alarm_on", self.alarm_on_command))
         application.add_handler(CommandHandler("alarm_off", self.alarm_off_command))
         application.add_handler(CommandHandler("alarm_status", self.alarm_status_command))
+        application.add_handler(CommandHandler("check", self.check_command))
+        application.add_handler(CommandHandler("c", self.check_command))  # 단축키
+        application.add_handler(CommandHandler("test", self.test_command))
+        application.add_handler(CommandHandler("t", self.test_command))  # 단축키
         
         log("")
         log_success("커맨드 핸들러 등록 완료:")
@@ -869,6 +1064,8 @@ class TelegramBotCommandHandler:
         log("   - /alarm_on: 알림 켜기")
         log("   - /alarm_off: 알림 끄기")
         log("   - /alarm_status: 알림 상태")
+        log("   - /check (/c): 알림 조건 확인")
+        log("   - /test (/t): 테스트 알림")
         
         log("")
         log("🚀 봇 시작... (Ctrl+C로 종료)")
