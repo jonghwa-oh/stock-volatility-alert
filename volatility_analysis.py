@@ -351,10 +351,10 @@ def visualize_volatility(data):
     is_korean = ticker.isdigit()
     if is_korean:
         chart_title = f"{ticker_name} ({ticker})"
-        currency = "won"  # 영문으로 변경 (폰트 문제 대비)
-        current_str = f"{current:,.0f} {currency}"
-        target_1x_str = f"{target_1x:,.0f} {currency}"
-        target_2x_str = f"{target_2x:,.0f} {currency}"
+        currency = "원"
+        current_str = f"{current:,.0f}{currency}"
+        target_1x_str = f"{target_1x:,.0f}{currency}"
+        target_2x_str = f"{target_2x:,.0f}{currency}"
     else:
         chart_title = f"{ticker} - {ticker_name}"
         currency = "$"
@@ -379,7 +379,7 @@ def visualize_volatility(data):
     
     # 통화 단위 결정
     if is_korean:
-        target_05x_str = f"{target_05x:,.0f}{currency}"
+        target_05x_str = f"{target_05x:,.0f}원"
     else:
         target_05x_str = f"{currency}{target_05x:,.2f}"
     
@@ -388,19 +388,19 @@ def visualize_volatility(data):
     
     if use_korean:
         lbl_current = f'현재가: {current_str}'
-        lbl_test = f'테스트: {target_05x_str} ({drop_05x:.2f}%)'
-        lbl_1st = f'1차 목표: {target_1x_str} ({data["drop_1x"]:.2f}%)'
-        lbl_2nd = f'2차 목표: {target_2x_str} ({data["drop_2x"]:.2f}%)'
-        lbl_title1 = f'{chart_title} - Price (1Y)'
-        lbl_date = 'Date'
-        lbl_price = 'Price'
-        lbl_avg = f'Avg: {mean_ret:+.2f}%'
-        lbl_std1p = f'+1 Std: {std_ret:.2f}%'
-        lbl_std1m = f'-1 Std: -{std_ret:.2f}%'
-        lbl_std2p = f'+2 Std: {2*std_ret:.2f}%'
-        lbl_std2m = f'-2 Std: -{2*std_ret:.2f}%'
-        lbl_title2 = f'{chart_title} - Daily Return (%)'
-        lbl_return = 'Daily Return (%)'
+        lbl_test = f'테스트: {target_05x_str} ({drop_05x:.2f}%↓)'
+        lbl_1st = f'1차 목표: {target_1x_str} ({data["drop_1x"]:.2f}%↓)'
+        lbl_2nd = f'2차 목표: {target_2x_str} ({data["drop_2x"]:.2f}%↓)'
+        lbl_title1 = f'{chart_title} - 1년간 가격 추이'
+        lbl_date = '날짜'
+        lbl_price = '가격'
+        lbl_avg = f'평균: {mean_ret:+.2f}%'
+        lbl_std1p = f'+1σ: {std_ret:.2f}%'
+        lbl_std1m = f'-1σ: -{std_ret:.2f}%'
+        lbl_std2p = f'+2σ: {2*std_ret:.2f}%'
+        lbl_std2m = f'-2σ: -{2*std_ret:.2f}%'
+        lbl_title2 = f'{chart_title} - 일일 수익률'
+        lbl_return = '일일 수익률 (%)'
     else:
         lbl_current = f'Current: {current_str}'
         lbl_test = f'Test: {target_05x_str} ({drop_05x:.2f}%)'
@@ -439,8 +439,10 @@ def visualize_volatility(data):
     ax2.axhline(y=-2*std_ret, color='purple', linestyle=':', linewidth=1.5, alpha=0.7, label=lbl_std2m)
     
     # 표준편차 범위 표시
-    ax2.fill_between(daily_returns.index, -std_ret, std_ret, alpha=0.1, color='orange', label='1 Std Range')
-    ax2.fill_between(daily_returns.index, -2*std_ret, 2*std_ret, alpha=0.05, color='purple', label='2 Std Range')
+    lbl_1std_range = '1σ 범위' if use_korean else '1 Std Range'
+    lbl_2std_range = '2σ 범위' if use_korean else '2 Std Range'
+    ax2.fill_between(daily_returns.index, -std_ret, std_ret, alpha=0.1, color='orange', label=lbl_1std_range)
+    ax2.fill_between(daily_returns.index, -2*std_ret, 2*std_ret, alpha=0.05, color='purple', label=lbl_2std_range)
     
     ax2.set_title(lbl_title2, fontsize=14, fontweight='bold', fontproperties=font_prop)
     ax2.set_xlabel(lbl_date, fontsize=12, fontproperties=font_prop)
@@ -454,28 +456,57 @@ def visualize_volatility(data):
     # 정규분포 곡선
     x = np.linspace(daily_returns.min(), daily_returns.max(), 100)
     normal_dist = (1 / (std_ret * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mean_ret) / std_ret) ** 2)
-    ax3.plot(x, normal_dist, 'r-', linewidth=2, label='Normal Dist')
+    
+    if use_korean:
+        lbl_normal = '정규분포'
+        lbl_zero = '변동없음 (0%)'
+        lbl_avg_line = f'평균: {mean_ret:+.2f}%'
+        lbl_1std_line = f'-1σ: -{std_ret:.2f}%'
+        lbl_2std_line = f'-2σ: -{2*std_ret:.2f}%'
+        lbl_title3 = f'{chart_title} - 수익률 분포'
+        lbl_xlabel3 = '일일 수익률 (%)'
+        lbl_ylabel3 = '빈도'
+    else:
+        lbl_normal = 'Normal Dist'
+        lbl_zero = '0% (No Change)'
+        lbl_avg_line = f'Avg: {mean_ret:+.2f}%'
+        lbl_1std_line = f'-1 Std: -{std_ret:.2f}%'
+        lbl_2std_line = f'-2 Std: -{2*std_ret:.2f}%'
+        lbl_title3 = f'{chart_title} - Distribution'
+        lbl_xlabel3 = 'Daily Return (%)'
+        lbl_ylabel3 = 'Frequency'
+    
+    ax3.plot(x, normal_dist, 'r-', linewidth=2, label=lbl_normal)
     
     # 기준선
-    ax3.axvline(x=0, color='black', linestyle='-', linewidth=2, label='0% (No Change)')
-    ax3.axvline(x=mean_ret, color='blue', linestyle='--', linewidth=2, label=f'Avg: {mean_ret:+.2f}%')
-    ax3.axvline(x=-std_ret, color='orange', linestyle=':', linewidth=2.5, label=f'-1 Std: -{std_ret:.2f}%')
-    ax3.axvline(x=-2*std_ret, color='purple', linestyle=':', linewidth=2.5, label=f'-2 Std: -{2*std_ret:.2f}%')
+    ax3.axvline(x=0, color='black', linestyle='-', linewidth=2, label=lbl_zero)
+    ax3.axvline(x=mean_ret, color='blue', linestyle='--', linewidth=2, label=lbl_avg_line)
+    ax3.axvline(x=-std_ret, color='orange', linestyle=':', linewidth=2.5, label=lbl_1std_line)
+    ax3.axvline(x=-2*std_ret, color='purple', linestyle=':', linewidth=2.5, label=lbl_2std_line)
     
-    ax3.set_title(f'{chart_title} - Distribution', fontsize=14, fontweight='bold', fontproperties=font_prop)
-    ax3.set_xlabel('Daily Return (%)', fontsize=12, fontproperties=font_prop)
-    ax3.set_ylabel('Frequency', fontsize=12, fontproperties=font_prop)
+    ax3.set_title(lbl_title3, fontsize=14, fontweight='bold', fontproperties=font_prop)
+    ax3.set_xlabel(lbl_xlabel3, fontsize=12, fontproperties=font_prop)
+    ax3.set_ylabel(lbl_ylabel3, fontsize=12, fontproperties=font_prop)
     ax3.legend(loc='best', fontsize=10, prop=font_prop)
     ax3.grid(True, alpha=0.3, axis='y')
     
-    # 통계 정보 박스 (영문)
-    textstr = f'Avg: {mean_ret:+.3f}%\n'
-    textstr += f'Std: {std_ret:.3f}%\n'
-    textstr += f'Max Up: {data["max_gain"]:+.2f}%\n'
-    textstr += f'Max Down: {data["max_loss"]:+.2f}%\n'
-    textstr += f'─────────────\n'
-    textstr += f'Up Days: {data["up_days"]}\n'
-    textstr += f'Down Days: {data["down_days"]}'
+    # 통계 정보 박스
+    if use_korean:
+        textstr = f'평균: {mean_ret:+.3f}%\n'
+        textstr += f'표준편차: {std_ret:.3f}%\n'
+        textstr += f'최대 상승: {data["max_gain"]:+.2f}%\n'
+        textstr += f'최대 하락: {data["max_loss"]:+.2f}%\n'
+        textstr += f'─────────────\n'
+        textstr += f'상승일: {data["up_days"]}일\n'
+        textstr += f'하락일: {data["down_days"]}일'
+    else:
+        textstr = f'Avg: {mean_ret:+.3f}%\n'
+        textstr += f'Std: {std_ret:.3f}%\n'
+        textstr += f'Max Up: {data["max_gain"]:+.2f}%\n'
+        textstr += f'Max Down: {data["max_loss"]:+.2f}%\n'
+        textstr += f'─────────────\n'
+        textstr += f'Up Days: {data["up_days"]}\n'
+        textstr += f'Down Days: {data["down_days"]}'
     
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
     ax3.text(0.98, 0.98, textstr, transform=ax3.transAxes, fontsize=10,
