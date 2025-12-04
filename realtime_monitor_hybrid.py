@@ -95,7 +95,16 @@ class HybridRealtimeMonitor:
         print(f"🇰🇷 한국 주식: {len(korean_stocks)}개 (WebSocket)")
         print(f"🇺🇸 미국 주식: {len(us_stocks)}개 (분봉 모니터링)")
         
+        # 종목 목록 출력
+        if korean_stocks:
+            print(f"   KR: {', '.join(korean_stocks.keys())}")
+        if us_stocks:
+            print(f"   US: {', '.join(us_stocks.keys())}")
+        
         # 매수 목표가 계산
+        success_count = 0
+        fail_list = []
+        
         for ticker, info in unique_stocks.items():
             name = info['name']
             country = info['country']
@@ -126,11 +135,22 @@ class HybridRealtimeMonitor:
                         print(f"  {flag} 테스트 매수: ${data['target_05x']:,.2f} ({data['drop_05x']:.2f}% 하락)")
                         print(f"  {flag} 1차 매수: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)")
                         print(f"  {flag} 2차 매수: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)")
+                    success_count += 1
                 else:
-                    print(f"  ❌ 분석 실패")
+                    print(f"  ❌ 분석 실패 (일봉 데이터 없음)")
+                    fail_list.append(ticker)
                     
             except Exception as e:
                 print(f"  ❌ 오류: {e}")
+                fail_list.append(ticker)
+        
+        # 결과 요약
+        print(f"\n{'='*50}")
+        print(f"📊 초기화 결과: {success_count}/{len(unique_stocks)} 종목 성공")
+        if fail_list:
+            print(f"❌ 실패 종목: {', '.join(fail_list)}")
+            print(f"💡 실패 종목은 /morning 명령으로 일봉 데이터 갱신 필요")
+        print(f"{'='*50}")
         
         # WebSocket 초기화 (한국 주식용)
         if korean_stocks:
@@ -358,12 +378,16 @@ class HybridRealtimeMonitor:
             print(f"  ⚠️  KIS API 비활성화: {e}")
             print(f"     FinanceDataReader로 대체합니다.")
         
+        poll_count = 0
         while True:
             # 알림 시간 체크
             if not self._is_alert_time():
                 log_warning("알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
                 await asyncio.sleep(60)
                 continue
+            
+            poll_count += 1
+            checked_tickers = []
             
             for ticker, targets in us_stocks.items():
                 try:
@@ -377,7 +401,7 @@ class HybridRealtimeMonitor:
                             if price_info:
                                 current_price = price_info['current_price']
                         except Exception as e:
-                            print(f"  ⚠️  KIS API 오류 ({ticker}): {e}")
+                            log_warning(f"KIS API 오류 ({ticker}): {e}")
                     
                     # 2순위: FDR (Fallback)
                     if current_price is None:
@@ -387,10 +411,18 @@ class HybridRealtimeMonitor:
                     
                     # 알림 확인
                     if current_price:
+                        checked_tickers.append(f"{ticker}:${current_price:.2f}")
                         await self.check_and_alert(ticker, current_price)
+                    else:
+                        checked_tickers.append(f"{ticker}:조회실패")
                 
                 except Exception as e:
-                    print(f"⚠️  {ticker} 조회 오류: {e}")
+                    log_error(f"{ticker} 조회 오류: {e}")
+                    checked_tickers.append(f"{ticker}:오류")
+            
+            # 10회마다 상태 로그 출력
+            if poll_count % 10 == 1:
+                log(f"🇺🇸 폴링 #{poll_count}: {', '.join(checked_tickers)}")
             
             # 1분 대기
             await asyncio.sleep(60)
