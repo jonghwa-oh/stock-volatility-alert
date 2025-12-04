@@ -105,14 +105,17 @@ class HybridRealtimeMonitor:
         success_count = 0
         fail_list = []
         
+        log_section("📊 종목별 분석 시작")
+        
         for ticker, info in unique_stocks.items():
             name = info['name']
             country = info['country']
+            flag = '🇰🇷' if country == 'KR' else '🇺🇸'
             
-            print(f"\n📊 {name} ({ticker}) 분석 중...")
+            log(f"\n{flag} [{ticker}] {name} 분석 중...")
             
             try:
-                data = analyze_daily_volatility(ticker, name)
+                data = analyze_daily_volatility(ticker, name, country=country)
                 
                 if data:
                     self.target_prices[ticker] = {
@@ -126,31 +129,34 @@ class HybridRealtimeMonitor:
                         'drop_2x': data['drop_2x']
                     }
                     
-                    flag = '🇰🇷' if country == 'KR' else '🇺🇸'
                     if country == 'KR':
-                        print(f"  {flag} 테스트 매수: {data['target_05x']:,.0f}원 ({data['drop_05x']:.2f}% 하락)")
-                        print(f"  {flag} 1차 매수: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)")
-                        print(f"  {flag} 2차 매수: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)")
+                        log_success(f"  [{ticker}] ✅ 0.5σ:{data['target_05x']:,.0f}원 | 1σ:{data['target_1x']:,.0f}원 | 2σ:{data['target_2x']:,.0f}원")
                     else:
-                        print(f"  {flag} 테스트 매수: ${data['target_05x']:,.2f} ({data['drop_05x']:.2f}% 하락)")
-                        print(f"  {flag} 1차 매수: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)")
-                        print(f"  {flag} 2차 매수: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)")
+                        log_success(f"  [{ticker}] ✅ 0.5σ:${data['target_05x']:.2f} | 1σ:${data['target_1x']:.2f} | 2σ:${data['target_2x']:.2f}")
                     success_count += 1
                 else:
-                    print(f"  ❌ 분석 실패 (일봉 데이터 없음)")
-                    fail_list.append(ticker)
+                    log_error(f"  [{ticker}] ❌ analyze_daily_volatility 반환값 None")
+                    fail_list.append(f"{ticker}(분석실패)")
                     
             except Exception as e:
-                print(f"  ❌ 오류: {e}")
-                fail_list.append(ticker)
+                log_error(f"  [{ticker}] ❌ 예외 발생: {e}")
+                import traceback
+                traceback.print_exc()
+                fail_list.append(f"{ticker}(예외:{str(e)[:20]})")
         
         # 결과 요약
-        print(f"\n{'='*50}")
-        print(f"📊 초기화 결과: {success_count}/{len(unique_stocks)} 종목 성공")
+        log_section("📊 초기화 결과")
+        log(f"✅ 성공: {success_count}/{len(unique_stocks)} 종목")
+        log(f"📍 target_prices 등록: {list(self.target_prices.keys())}")
+        
         if fail_list:
-            print(f"❌ 실패 종목: {', '.join(fail_list)}")
-            print(f"💡 실패 종목은 /morning 명령으로 일봉 데이터 갱신 필요")
-        print(f"{'='*50}")
+            log_error(f"❌ 실패: {', '.join(fail_list)}")
+        
+        # 국가별 target_prices 확인
+        kr_targets = [t for t, p in self.target_prices.items() if p['country'] == 'KR']
+        us_targets = [t for t, p in self.target_prices.items() if p['country'] == 'US']
+        log(f"🇰🇷 한국 target_prices: {kr_targets}")
+        log(f"🇺🇸 미국 target_prices: {us_targets}")
         
         # WebSocket 초기화 (한국 주식용)
         if korean_stocks:

@@ -186,10 +186,24 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, cou
     start_date = end_date - timedelta(days=365)
     
     try:
+        print(f"  📥 [{ticker}] FDR 데이터 조회 중... ({start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')})")
         df = fdr.DataReader(ticker, start_date, end_date)
+        
+        if df is None or df.empty:
+            print(f"  ❌ [{ticker}] FDR 데이터 비어있음 (df is None or empty)")
+            return None
+        
+        print(f"  ✅ [{ticker}] FDR 데이터 {len(df)}개 로드 완료")
         close_prices = df['Close']
+        
+        if close_prices.empty:
+            print(f"  ❌ [{ticker}] Close 컬럼 비어있음")
+            return None
+            
     except Exception as e:
-        print(f"❌ 데이터를 가져올 수 없습니다: {e}")
+        print(f"  ❌ [{ticker}] FDR 데이터 조회 실패: {e}")
+        import traceback
+        traceback.print_exc()
         return None
     
     # 일일 수익률 계산 (%)
