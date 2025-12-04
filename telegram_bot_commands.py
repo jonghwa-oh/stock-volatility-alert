@@ -671,13 +671,13 @@ class TelegramBotCommandHandler:
                 if country == 'KR':
                     price_data = self.kis_api.get_stock_price(ticker)
                     if price_data:
-                        current_price = price_data['price']
+                        current_price = price_data.get('current_price') or price_data.get('price')
                     else:
                         current_price = None
                 else:
                     price_data = self.kis_api.get_overseas_stock_price(ticker)
                     if price_data:
-                        current_price = price_data['price']
+                        current_price = price_data.get('current_price') or price_data.get('price')
                     else:
                         current_price = None
                 
@@ -873,14 +873,18 @@ class TelegramBotCommandHandler:
                 price_data = self.kis_api.get_overseas_stock_price(ticker)
             
             if not price_data:
-                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패")
+                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패 (API 응답 없음)")
                 return
             
-            current_price = price_data['price']
+            current_price = price_data.get('current_price') or price_data.get('price')
             name = price_data.get('name', ticker)
             
+            if not current_price:
+                await update.message.reply_text(f"❌ {ticker} 현재가 없음 (장 마감 또는 API 오류)")
+                return
+            
             # 목표가 계산
-            data = analyze_daily_volatility(ticker, name)
+            data = analyze_daily_volatility(ticker, name, country=country)
             
             if not data:
                 await update.message.reply_text(f"❌ {ticker} 분석 실패 (일봉 데이터 확인 필요)")
@@ -979,14 +983,18 @@ class TelegramBotCommandHandler:
                 price_data = self.kis_api.get_overseas_stock_price(ticker)
             
             if not price_data:
-                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패")
+                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패 (API 응답 없음)")
                 return
             
-            current_price = price_data['price']
+            current_price = price_data.get('current_price') or price_data.get('price')
             name = price_data.get('name', ticker)
             
+            if not current_price:
+                await update.message.reply_text(f"❌ {ticker} 현재가 없음 (장 마감 또는 API 오류)")
+                return
+            
             # 목표가 계산
-            data = analyze_daily_volatility(ticker, name)
+            data = analyze_daily_volatility(ticker, name, country=country)
             
             if not data:
                 await update.message.reply_text(f"❌ {ticker} 분석 실패 (일봉 데이터 확인 필요)")
