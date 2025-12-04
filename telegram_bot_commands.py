@@ -867,21 +867,39 @@ class TelegramBotCommandHandler:
             flag = '🇰🇷' if country == 'KR' else '🇺🇸'
             
             # 현재가 조회
+            log_debug(f"[/c] {ticker} 현재가 조회 시작 (country={country})")
+            
             if country == 'KR':
                 price_data = self.kis_api.get_stock_price(ticker)
             else:
-                price_data = self.kis_api.get_overseas_stock_price(ticker)
+                exchange = self.kis_api.get_exchange_code(ticker)
+                log_debug(f"[/c] {ticker} 거래소: {exchange}")
+                price_data = self.kis_api.get_overseas_stock_price(ticker, exchange)
+            
+            log_debug(f"[/c] {ticker} API 응답: {price_data}")
             
             if not price_data:
-                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패 (API 응답 없음)")
+                await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패\n\nAPI 응답이 없습니다.")
                 return
             
             current_price = price_data.get('current_price') or price_data.get('price')
             name = price_data.get('name', ticker)
             
-            if not current_price:
-                await update.message.reply_text(f"❌ {ticker} 현재가 없음 (장 마감 또는 API 오류)")
-                return
+            log_debug(f"[/c] {ticker} current_price={current_price}, name={name}")
+            
+            if not current_price or current_price == 0:
+                # 장외 시간일 수 있으므로 전일 종가 사용
+                prev_close = price_data.get('prev_close', 0)
+                if prev_close and prev_close > 0:
+                    current_price = prev_close
+                    await update.message.reply_text(f"⚠️ {ticker} 장외 시간 - 전일 종가 사용: ${prev_close:.2f}")
+                else:
+                    await update.message.reply_text(
+                        f"❌ {ticker} 현재가 없음\n\n"
+                        f"• 장 마감 시간일 수 있습니다\n"
+                        f"• API 응답: current_price={price_data.get('current_price')}"
+                    )
+                    return
             
             # 목표가 계산
             data = analyze_daily_volatility(ticker, name, country=country)
