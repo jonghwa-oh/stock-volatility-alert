@@ -326,15 +326,53 @@ class KISApi:
         Returns:
             str: 거래소 코드 (NAS, NYS, AMS)
         """
-        # 나스닥 주요 종목들
+        # 나스닥 종목들
         nasdaq_tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 
                           'TSLA', 'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 
-                          'CSCO', 'TQQQ', 'QQQ', 'SOXL', 'QLD', 'TECL']
+                          'CSCO', 'TQQQ', 'QQQ', 'QLD']
         
-        if ticker.upper() in nasdaq_tickers:
+        # NYSE ARCA (아멕스) - 레버리지/인버스 ETF 많음
+        arca_tickers = ['SOXL', 'SOXS', 'TECL', 'TECS', 'SPXL', 'SPXS', 
+                        'UPRO', 'SPXU', 'TNA', 'TZA', 'FAS', 'FAZ',
+                        'LABU', 'LABD', 'NUGT', 'DUST', 'JNUG', 'JDST',
+                        'ERX', 'ERY', 'GUSH', 'DRIP', 'NAIL', 'DRV']
+        
+        ticker_upper = ticker.upper()
+        
+        if ticker_upper in nasdaq_tickers:
             return "NAS"
+        elif ticker_upper in arca_tickers:
+            return "AMS"  # NYSE ARCA → 아멕스 코드
         else:
             return "NYS"  # 기본값: 뉴욕증권거래소
+    
+    def get_overseas_stock_price_auto(self, ticker: str) -> Optional[dict]:
+        """
+        여러 거래소를 시도하여 해외주식 현재가 조회
+        
+        Args:
+            ticker: 종목코드
+        
+        Returns:
+            dict: 주식 시세 정보 또는 None
+        """
+        # 시도할 거래소 순서
+        exchanges = ['NAS', 'AMS', 'NYS']
+        
+        # 추측 거래소를 먼저 시도
+        guessed = self.get_exchange_code(ticker)
+        if guessed in exchanges:
+            exchanges.remove(guessed)
+            exchanges.insert(0, guessed)
+        
+        for exchange in exchanges:
+            result = self.get_overseas_stock_price(ticker, exchange)
+            if result and result.get('current_price', 0) > 0:
+                print(f"  ✅ {ticker} 거래소 확인: {exchange}")
+                return result
+        
+        print(f"  ❌ {ticker} 모든 거래소에서 조회 실패")
+        return None
     
     def close(self):
         """리소스 정리"""

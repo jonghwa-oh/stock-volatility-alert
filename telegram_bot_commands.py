@@ -368,8 +368,8 @@ class TelegramBotCommandHandler:
                     df = fdr.DataReader(ticker)
                     ticker_name = ticker
             else:
-                # KIS API로 미국 주식 조회
-                price_data = self.kis_api.get_overseas_stock_price(ticker)
+                # KIS API로 미국 주식 조회 (여러 거래소 시도)
+                price_data = self.kis_api.get_overseas_stock_price_auto(ticker)
                 if price_data and 'name' in price_data:
                     ticker_name = price_data['name']
                 else:
@@ -675,7 +675,7 @@ class TelegramBotCommandHandler:
                     else:
                         current_price = None
                 else:
-                    price_data = self.kis_api.get_overseas_stock_price(ticker)
+                    price_data = self.kis_api.get_overseas_stock_price_auto(ticker)
                     if price_data:
                         current_price = price_data.get('current_price') or price_data.get('price')
                     else:
@@ -872,9 +872,8 @@ class TelegramBotCommandHandler:
             if country == 'KR':
                 price_data = self.kis_api.get_stock_price(ticker)
             else:
-                exchange = self.kis_api.get_exchange_code(ticker)
-                log_debug(f"[/c] {ticker} 거래소: {exchange}")
-                price_data = self.kis_api.get_overseas_stock_price(ticker, exchange)
+                # 여러 거래소를 자동으로 시도
+                price_data = self.kis_api.get_overseas_stock_price_auto(ticker)
             
             log_debug(f"[/c] {ticker} API 응답: {price_data}")
             
@@ -998,7 +997,7 @@ class TelegramBotCommandHandler:
             if country == 'KR':
                 price_data = self.kis_api.get_stock_price(ticker)
             else:
-                price_data = self.kis_api.get_overseas_stock_price(ticker)
+                price_data = self.kis_api.get_overseas_stock_price_auto(ticker)
             
             if not price_data:
                 await update.message.reply_text(f"❌ {ticker} 현재가 조회 실패 (API 응답 없음)")
