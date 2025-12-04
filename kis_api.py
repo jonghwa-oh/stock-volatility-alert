@@ -329,13 +329,14 @@ class KISApi:
         # 나스닥 종목들
         nasdaq_tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 
                           'TSLA', 'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 
-                          'CSCO', 'TQQQ', 'QQQ', 'QLD']
+                          'CSCO', 'TQQQ', 'QQQ']
         
         # NYSE ARCA (아멕스) - 레버리지/인버스 ETF 많음
         arca_tickers = ['SOXL', 'SOXS', 'TECL', 'TECS', 'SPXL', 'SPXS', 
                         'UPRO', 'SPXU', 'TNA', 'TZA', 'FAS', 'FAZ',
                         'LABU', 'LABD', 'NUGT', 'DUST', 'JNUG', 'JDST',
-                        'ERX', 'ERY', 'GUSH', 'DRIP', 'NAIL', 'DRV']
+                        'ERX', 'ERY', 'GUSH', 'DRIP', 'NAIL', 'DRV',
+                        'QLD', 'SQQQ', 'TECS', 'UDOW', 'SDOW']  # QLD도 ARCA
         
         ticker_upper = ticker.upper()
         
