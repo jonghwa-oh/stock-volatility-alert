@@ -42,8 +42,16 @@ class HybridRealtimeMonitor:
         if self.debug_mode:
             log_debug("DEBUG MODE: 24시간 알림 활성화")
     
+    def _is_weekday(self) -> bool:
+        """평일(월-금) 여부 확인"""
+        return datetime.now().weekday() < 5  # 0=월, 4=금, 5=토, 6=일
+    
     def _is_alert_time(self) -> bool:
-        """알림 가능 시간 확인 (08:00~24:00, DEBUG_MODE시 항상 true)"""
+        """알림 가능 시간 확인 (월-금 08:00~24:00, DEBUG_MODE시 시간 제한만 해제)"""
+        # 주말 체크 (DEBUG_MODE에서도 주말은 제외)
+        if not self._is_weekday():
+            return False
+        
         if self.debug_mode:
             return True
         
@@ -385,12 +393,22 @@ class HybridRealtimeMonitor:
             print(f"     FinanceDataReader로 대체합니다.")
         
         poll_count = 0
+        weekend_logged = False
+        
         while True:
             # 알림 시간 체크
             if not self._is_alert_time():
-                log_warning("알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
+                if not self._is_weekday():
+                    if not weekend_logged:
+                        log_warning("📅 주말입니다. 모니터링 대기 중... (월요일 자동 시작)")
+                        weekend_logged = True
+                else:
+                    log_warning("알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
+                    weekend_logged = False
                 await asyncio.sleep(60)
                 continue
+            
+            weekend_logged = False
             
             poll_count += 1
             checked_tickers = []
@@ -438,8 +456,13 @@ class HybridRealtimeMonitor:
         print("👂 하이브리드 실시간 모니터링 시작!")
         print("="*70)
         print(f"📊 모니터링 종목: {len(self.target_prices)}개")
-        print(f"⏰ 알림 시간: {self.alert_start_time.strftime('%H:%M')} ~ {self.alert_end_time.strftime('%H:%M')}")
+        print(f"⏰ 알림 시간: {self.alert_start_time.strftime('%H:%M')} ~ {self.alert_end_time.strftime('%H:%M')} (월-금)")
+        print(f"📅 주말 제외: 토/일요일은 자동으로 모니터링 건너뜀")
         print(f"⏰ 시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        if not self._is_weekday():
+            print("\n📅 현재 주말입니다. 월요일까지 대기합니다...")
+        
         print("\n💡 Ctrl+C로 종료")
         print("="*70)
         
