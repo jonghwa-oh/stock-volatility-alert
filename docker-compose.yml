@@ -43,7 +43,15 @@ services:
     build: .
     container_name: stock_web
     restart: unless-stopped
-    command: gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 'web.app:create_app()'
+    command: >
+      gunicorn
+      --bind 0.0.0.0:8080
+      --workers 1
+      --threads 2
+      --timeout 300
+      --keep-alive 5
+      --preload
+      'web.app:create_app()'
     
     ports:
       - "8080:8080"
@@ -56,6 +64,8 @@ services:
       - TZ=Asia/Seoul
       - PYTHONUNBUFFERED=1
       - FLASK_SECRET_KEY=stock-alert-secret-key-2024-very-secure-random
+      # 성능 최적화
+      - MALLOC_ARENA_MAX=2
     
     logging:
       driver: "json-file"
@@ -66,7 +76,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 384M
         reservations:
-          memory: 128M
+          memory: 192M
 
