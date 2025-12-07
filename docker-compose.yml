@@ -55,7 +55,7 @@ services:
     environment:
       - TZ=Asia/Seoul
       - PYTHONUNBUFFERED=1
-      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-change-this-secret-key}
+      - FLASK_SECRET_KEY=stock-alert-secret-key-2024-very-secure-random
     
     logging:
       driver: "json-file"
