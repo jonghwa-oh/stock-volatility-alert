@@ -38,3 +38,35 @@ services:
         reservations:
           memory: 256M
 
+  # 웹 대시보드
+  stock-web:
+    build: .
+    container_name: stock_web
+    restart: unless-stopped
+    command: gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 'web.app:create_app()'
+    
+    ports:
+      - "5000:5000"
+    
+    volumes:
+      - ./data:/app/data
+      - ./charts:/app/charts
+    
+    environment:
+      - TZ=Asia/Seoul
+      - PYTHONUNBUFFERED=1
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-change-this-secret-key}
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+

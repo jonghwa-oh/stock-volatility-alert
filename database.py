@@ -87,6 +87,7 @@ class StockDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 chat_id TEXT NOT NULL,
+                password_hash TEXT,
                 investment_amount REAL DEFAULT 1000000,
                 enabled BOOLEAN DEFAULT 1,
                 notification_enabled BOOLEAN DEFAULT 1,
@@ -97,6 +98,13 @@ class StockDatabase:
         # notification_enabled 컬럼 추가 (기존 테이블 업데이트)
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN notification_enabled BOOLEAN DEFAULT 1")
+        except sqlite3.OperationalError:
+            # 이미 컬럼이 존재하면 무시
+            pass
+        
+        # password_hash 컬럼 추가 (웹 로그인용)
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
         except sqlite3.OperationalError:
             # 이미 컬럼이 존재하면 무시
             pass
@@ -479,15 +487,21 @@ class StockDatabase:
             }
         return None
     
-    def get_all_users(self) -> List[Dict]:
-        """모든 활성 사용자 조회"""
+    def get_all_users(self, include_disabled: bool = False) -> List[Dict]:
+        """모든 사용자 조회"""
         conn = self.connect()
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT id, name, chat_id, investment_amount, enabled
-            FROM users WHERE enabled = 1
-        ''')
+        if include_disabled:
+            cursor.execute('''
+                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash
+                FROM users
+            ''')
+        else:
+            cursor.execute('''
+                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash
+                FROM users WHERE enabled = 1
+            ''')
         
         users = []
         for row in cursor.fetchall():
@@ -496,7 +510,9 @@ class StockDatabase:
                 'name': row[1],
                 'chat_id': row[2],
                 'investment_amount': row[3],
-                'enabled': row[4]
+                'enabled': row[4],
+                'notification_enabled': row[5] if row[5] is not None else 1,
+                'password_hash': row[6]
             })
         return users
     
@@ -633,6 +649,53 @@ class StockDatabase:
                 'country': row[2] or 'US'
             })
         return watchlist
+    
+    # ============ 웹 인증 관리 ============
+    
+    def set_user_password(self, name: str, password_hash: str) -> bool:
+        """사용자 비밀번호 설정"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                UPDATE users SET password_hash = ? WHERE name = ?
+            ''', (password_hash, name))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ 비밀번호 설정 실패: {e}")
+            return False
+    
+    def get_user_by_name(self, name: str) -> Dict:
+        """사용자 정보 조회 (웹 로그인용, 비밀번호 해시 포함)"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash
+            FROM users WHERE name = ?
+        ''', (name,))
+        
+        result = cursor.fetchone()
+        if result:
+            return {
+                'id': result[0],
+                'name': result[1],
+                'chat_id': result[2],
+                'investment_amount': result[3],
+                'enabled': result[4],
+                'notification_enabled': result[5] if result[5] is not None else 1,
+                'password_hash': result[6]
+            }
+        return None
+    
+    def verify_user_password(self, name: str, password_hash: str) -> bool:
+        """사용자 비밀번호 확인"""
+        user = self.get_user_by_name(name)
+        if user and user['password_hash']:
+            return user['password_hash'] == password_hash
+        return False
     
     # ============ 설정 관리 ============
     

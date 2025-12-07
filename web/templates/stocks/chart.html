@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticker }} 차트 - 주식 알림{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 헤더 -->
+    <div class="flex items-center gap-4">
+        <a href="{{ url_for('stocks.list_stocks') }}"
+           class="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+            ← 
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <span>{{ '🇰🇷' if stock_info and stock_info.country == 'KR' else '🇺🇸' }}</span>
+                {{ stock_info.name if stock_info else ticker }}
+            </h1>
+            <p class="text-slate-400">{{ ticker }}</p>
+        </div>
+    </div>
+    
+    {% if analysis %}
+    <!-- 분석 요약 -->
+    <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="text-center p-4 bg-slate-700/50 rounded-xl">
+                <p class="text-sm text-slate-400 mb-1">현재가</p>
+                <p class="text-xl font-bold">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.current_price) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.current_price) }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-center p-4 bg-yellow-500/10 rounded-xl">
+                <p class="text-sm text-yellow-400 mb-1">0.5σ 목표</p>
+                <p class="text-xl font-bold text-yellow-400">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.target_05x) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.target_05x) }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-center p-4 bg-blue-500/10 rounded-xl">
+                <p class="text-sm text-blue-400 mb-1">1σ 목표</p>
+                <p class="text-xl font-bold text-blue-400">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.target_1x) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.target_1x) }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-center p-4 bg-purple-500/10 rounded-xl">
+                <p class="text-sm text-purple-400 mb-1">2σ 목표</p>
+                <p class="text-xl font-bold text-purple-400">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.target_2x) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.target_2x) }}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-slate-700 flex items-center justify-between text-sm">
+            <span class="text-slate-400">일일 변동성</span>
+            <span class="font-medium">{{ "{:.2f}".format(analysis.daily_volatility) }}%</span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 차트 이미지 -->
+    {% if chart_files %}
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <h2 class="text-lg font-bold mb-4">📈 변동성 차트</h2>
+        
+        <div class="space-y-4">
+            {% for chart in chart_files %}
+            <div class="bg-slate-900 rounded-xl overflow-hidden">
+                <img src="{{ url_for('serve_chart', filename=chart) }}" 
+                     alt="{{ ticker }} 차트"
+                     class="w-full"
+                     loading="lazy">
+                <p class="text-center text-sm text-slate-400 py-2">
+                    {{ chart.split('/')[-1].split('_')[0] }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-16 bg-slate-800 rounded-2xl border border-slate-700">
+        <div class="text-6xl mb-4">📊</div>
+        <h2 class="text-xl font-bold mb-2">차트가 없습니다</h2>
+        <p class="text-slate-400">아침 분석 시 차트가 생성됩니다</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

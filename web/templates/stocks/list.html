@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}종목 관리 - 주식 알림{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold">📋 종목 관리</h1>
+        <a href="{{ url_for('stocks.add_stock') }}"
+           class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+            ➕ 추가
+        </a>
+    </div>
+    
+    {% if watchlist %}
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+        <div class="divide-y divide-slate-700">
+            {% for stock in watchlist %}
+            <div class="flex items-center justify-between p-4 hover:bg-slate-700/50 transition-colors">
+                <div class="flex items-center gap-4">
+                    <span class="text-2xl">{{ '🇰🇷' if stock.country == 'KR' else '🇺🇸' }}</span>
+                    <div>
+                        <p class="font-medium">{{ stock.name }}</p>
+                        <p class="text-sm text-slate-400">{{ stock.ticker }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <a href="{{ url_for('stocks.view_chart', ticker=stock.ticker) }}"
+                       class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm">
+                        📈 차트
+                    </a>
+                    <form method="POST" action="{{ url_for('stocks.delete_stock', ticker=stock.ticker) }}"
+                          onsubmit="return confirm('{{ stock.ticker }} 종목을 삭제하시겠습니까?');">
+                        <button type="submit" 
+                                class="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm">
+                            🗑️
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-16 bg-slate-800 rounded-2xl border border-slate-700">
+        <div class="text-6xl mb-4">📭</div>
+        <h2 class="text-xl font-bold mb-2">등록된 종목이 없습니다</h2>
+        <p class="text-slate-400 mb-6">관심 종목을 추가하여 모니터링을 시작하세요</p>
+        <a href="{{ url_for('stocks.add_stock') }}"
+           class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+            ➕ 종목 추가하기
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

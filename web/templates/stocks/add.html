@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}종목 추가 - 주식 알림{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-6">➕ 종목 추가</h1>
+    
+    <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">국가</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="flex items-center justify-center gap-2 p-4 bg-slate-700 rounded-xl cursor-pointer
+                                  border-2 border-transparent has-[:checked]:border-blue-500 transition-colors">
+                        <input type="radio" name="country" value="US" checked class="hidden">
+                        <span class="text-2xl">🇺🇸</span>
+                        <span>미국</span>
+                    </label>
+                    <label class="flex items-center justify-center gap-2 p-4 bg-slate-700 rounded-xl cursor-pointer
+                                  border-2 border-transparent has-[:checked]:border-blue-500 transition-colors">
+                        <input type="radio" name="country" value="KR" class="hidden">
+                        <span class="text-2xl">🇰🇷</span>
+                        <span>한국</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">종목 코드</label>
+                <input type="text" name="ticker" required
+                       class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl
+                              text-white placeholder-slate-400 uppercase
+                              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       placeholder="예: TQQQ, 005930">
+                <p class="mt-2 text-sm text-slate-400">
+                    미국: TQQQ, SOXL 등 / 한국: 005930, 122630 등
+                </p>
+            </div>
+            
+            <div class="flex gap-3 pt-2">
+                <a href="{{ url_for('stocks.list_stocks') }}"
+                   class="flex-1 py-3 text-center bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors">
+                    취소
+                </a>
+                <button type="submit"
+                        class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors">
+                    추가하기
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

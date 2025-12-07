@@ -1,0 +1,23 @@
+{
+    "name": "주식 변동성 알림",
+    "short_name": "주식알림",
+    "description": "표준편차 기반 주식 매수 타이밍 알림",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/static/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
+
