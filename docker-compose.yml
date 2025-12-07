@@ -50,7 +50,9 @@ services:
       --threads 2
       --timeout 300
       --keep-alive 5
-      --preload
+      --access-logfile -
+      --error-logfile -
+      --log-level debug
       'web.app:create_app()'
     
     ports:
