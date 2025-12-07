@@ -27,12 +27,14 @@ def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
                 'drop_05x': data['drop_05x'],
                 'drop_1x': data['drop_1x'],
                 'drop_2x': data['drop_2x'],
-                'std_dev': data['std_dev'],
-                'volatility': data['daily_volatility'],
+                'std_return': data['std_return'],
+                'volatility': data['std_return'],  # 이미 퍼센트 값
                 'success': True
             }
     except Exception as e:
         print(f"분석 오류 ({ticker}): {e}")
+        import traceback
+        traceback.print_exc()
     
     return {
         'ticker': ticker,

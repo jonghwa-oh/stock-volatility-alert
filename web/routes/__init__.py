@@ -7,3 +7,4 @@ from web.routes.stocks import stocks_bp
 
 __all__ = ['main_bp', 'api_bp', 'stocks_bp']
 
+

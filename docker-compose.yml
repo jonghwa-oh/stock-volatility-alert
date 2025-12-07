@@ -43,10 +43,10 @@ services:
     build: .
     container_name: stock_web
     restart: unless-stopped
-    command: gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 'web.app:create_app()'
+    command: gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 'web.app:create_app()'
     
     ports:
-      - "5000:5000"
+      - "8080:8080"
     
     volumes:
       - ./data:/app/data

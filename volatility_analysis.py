@@ -158,7 +158,7 @@ def get_stock_name_from_api(ticker: str, country: str = None) -> str:
     return ticker
 
 
-def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, country='KR'):
+def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, country='KR', create_chart=True):
     """
     일일 변동성 분석
     
@@ -167,6 +167,7 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, cou
         ticker_name: 종목명
         investment_amount: 투자 금액
         country: 국가 코드 ('KR' 또는 'US')
+        create_chart: 차트 생성 여부 (기본값: True)
     """
     # 국가 판별 (country 파라미터 사용)
     is_korean = (country == 'KR')
@@ -185,25 +186,54 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, cou
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365)
     
+    df = None
+    close_prices = None
+    
+    # 1차: FDR로 시도
     try:
         print(f"  📥 [{ticker}] FDR 데이터 조회 중... ({start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')})")
         df = fdr.DataReader(ticker, start_date, end_date)
         
-        if df is None or df.empty:
-            print(f"  ❌ [{ticker}] FDR 데이터 비어있음 (df is None or empty)")
-            return None
-        
-        print(f"  ✅ [{ticker}] FDR 데이터 {len(df)}개 로드 완료")
-        close_prices = df['Close']
-        
-        if close_prices.empty:
-            print(f"  ❌ [{ticker}] Close 컬럼 비어있음")
-            return None
+        if df is not None and not df.empty:
+            print(f"  ✅ [{ticker}] FDR 데이터 {len(df)}개 로드 완료")
+            close_prices = df['Close']
             
     except Exception as e:
-        print(f"  ❌ [{ticker}] FDR 데이터 조회 실패: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"  ⚠️ [{ticker}] FDR 데이터 조회 실패: {e}")
+    
+    # 2차: FDR 실패 시 KIS API로 시도
+    if close_prices is None or (hasattr(close_prices, 'empty') and close_prices.empty):
+        try:
+            print(f"  📥 [{ticker}] KIS API로 재시도...")
+            from kis_api import KISApi
+            api = KISApi()
+            
+            if is_korean:
+                kis_df = api.get_daily_price_history(ticker, 
+                    start_date.strftime('%Y%m%d'), 
+                    end_date.strftime('%Y%m%d'))
+            else:
+                exchange = api.get_exchange_code(ticker)
+                kis_df = api.get_overseas_daily_price_history(ticker, exchange,
+                    start_date.strftime('%Y%m%d'),
+                    end_date.strftime('%Y%m%d'))
+            
+            api.close()
+            
+            if kis_df is not None and not kis_df.empty:
+                print(f"  ✅ [{ticker}] KIS API 데이터 {len(kis_df)}개 로드 완료")
+                df = kis_df
+                close_prices = df['Close']
+            else:
+                print(f"  ❌ [{ticker}] KIS API 데이터도 없음")
+                return None
+                
+        except Exception as e:
+            print(f"  ❌ [{ticker}] KIS API 조회도 실패: {e}")
+            return None
+    
+    if close_prices is None or (hasattr(close_prices, 'empty') and close_prices.empty):
+        print(f"  ❌ [{ticker}] 데이터를 가져올 수 없습니다")
         return None
     
     # 일일 수익률 계산 (%)
