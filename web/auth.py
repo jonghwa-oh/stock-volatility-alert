@@ -97,10 +97,14 @@ def login_required(f):
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """로그인 페이지"""
+    print(f"🔐 [LOGIN] 요청 시작 - Method: {request.method}")
+    
     if 'user' in session:
+        print(f"🔐 [LOGIN] 이미 로그인됨: {session.get('user')}")
         return redirect(url_for('main.index'))
     
     client_ip = get_client_ip()
+    print(f"🔐 [LOGIN] Client IP: {client_ip}")
     
     # 잠금 상태 확인
     locked, remaining_seconds = is_locked_out(client_ip)
@@ -114,13 +118,24 @@ def login():
         password = request.form.get('password', '')
         remember = request.form.get('remember', False)
         
+        print(f"🔐 [LOGIN] 로그인 시도 - username: {username}")
+        
         if not username or not password:
             flash('아이디와 비밀번호를 입력해주세요.', 'error')
             return render_template('login.html')
         
-        db = StockDatabase()
-        user = db.get_user_by_name(username)
-        db.close()
+        try:
+            db = StockDatabase()
+            print(f"🔐 [LOGIN] DB 연결 성공")
+            user = db.get_user_by_name(username)
+            print(f"🔐 [LOGIN] 사용자 조회 결과: {user}")
+            db.close()
+        except Exception as e:
+            print(f"❌ [LOGIN] DB 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            flash('데이터베이스 오류가 발생했습니다.', 'error')
+            return render_template('login.html')
         
         if not user:
             count, is_locked = record_failed_attempt(client_ip)
@@ -137,8 +152,10 @@ def login():
         
         # 비밀번호 미설정 시 (첫 로그인)
         if not user['password_hash']:
+            print(f"🔐 [LOGIN] 첫 로그인 - 비밀번호 설정 페이지로 이동")
             # 비밀번호 설정 페이지로 이동
             session['temp_user'] = username
+            print(f"🔐 [LOGIN] 세션에 temp_user 저장: {username}")
             return redirect(url_for('auth.set_password'))
         
         # 비밀번호 확인
@@ -170,14 +187,21 @@ def login():
 @auth_bp.route('/set-password', methods=['GET', 'POST'])
 def set_password():
     """비밀번호 설정 (첫 로그인 시)"""
+    print(f"🔑 [SET-PW] 요청 시작 - Method: {request.method}")
+    print(f"🔑 [SET-PW] 세션: {dict(session)}")
+    
     if 'temp_user' not in session:
+        print(f"🔑 [SET-PW] temp_user 없음 - 로그인 페이지로 리다이렉트")
         return redirect(url_for('auth.login'))
     
     username = session['temp_user']
+    print(f"🔑 [SET-PW] username: {username}")
     
     if request.method == 'POST':
         password = request.form.get('password', '')
         password_confirm = request.form.get('password_confirm', '')
+        
+        print(f"🔑 [SET-PW] 비밀번호 설정 시도")
         
         if len(password) < 4:
             flash('비밀번호는 4자 이상이어야 합니다.', 'error')
@@ -187,26 +211,35 @@ def set_password():
             flash('비밀번호가 일치하지 않습니다.', 'error')
             return render_template('set_password.html', username=username)
         
-        # 비밀번호 저장
-        db = StockDatabase()
-        password_hash = hash_password(password)
-        success = db.set_user_password(username, password_hash)
-        
-        if success:
-            user = db.get_user_by_name(username)
-            db.close()
+        try:
+            # 비밀번호 저장
+            db = StockDatabase()
+            password_hash = hash_password(password)
+            print(f"🔑 [SET-PW] 비밀번호 해시 생성 완료")
+            success = db.set_user_password(username, password_hash)
+            print(f"🔑 [SET-PW] DB 저장 결과: {success}")
             
-            # 세션 정리 및 로그인 처리
-            session.pop('temp_user', None)
-            session['user'] = username
-            session['user_id'] = user['id']
-            session.permanent = True
-            
-            flash('비밀번호가 설정되었습니다! 🎉', 'success')
-            return redirect(url_for('main.index'))
-        else:
-            db.close()
-            flash('비밀번호 설정에 실패했습니다.', 'error')
+            if success:
+                user = db.get_user_by_name(username)
+                db.close()
+                
+                # 세션 정리 및 로그인 처리
+                session.pop('temp_user', None)
+                session['user'] = username
+                session['user_id'] = user['id']
+                session.permanent = True
+                
+                print(f"🔑 [SET-PW] 로그인 성공 - 세션: {dict(session)}")
+                flash('비밀번호가 설정되었습니다! 🎉', 'success')
+                return redirect(url_for('main.index'))
+            else:
+                db.close()
+                flash('비밀번호 설정에 실패했습니다.', 'error')
+        except Exception as e:
+            print(f"❌ [SET-PW] 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            flash('오류가 발생했습니다.', 'error')
     
     return render_template('set_password.html', username=username)
 
