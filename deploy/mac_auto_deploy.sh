@@ -48,15 +48,22 @@ if [ "$LOCAL" != "$REMOTE" ]; then
     COMMIT_MSG=$(git log -1 --pretty=format:"%s")
     COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
     
-    # 빌드 방식 결정
-    if echo "$CHANGED_FILES" | grep -qE "(Dockerfile|requirements.txt)"; then
+    # 빌드 방식 결정 (새 파일 추가 시에도 --no-cache 필요)
+    if echo "$CHANGED_FILES" | grep -qE "(Dockerfile|requirements\.txt)"; then
         BUILD_TYPE="전체 빌드 (--no-cache)"
         log "🐳 $BUILD_TYPE"
         docker-compose build --no-cache
     else
-        BUILD_TYPE="빠른 빌드"
+        BUILD_TYPE="빠른 빌드 (--build)"
         log "🐳 $BUILD_TYPE"
-        docker-compose build
+        docker-compose up -d --build
+        log "✅ 배포 완료!"
+        log "   📦 변경: ${CHANGED_COUNT}개 파일"
+        log "   🔧 빌드: ${BUILD_TYPE}"
+        log "   💬 커밋: ${COMMIT_MSG}"
+        log "   👤 작성자: ${COMMIT_AUTHOR}"
+        log ""
+        exit 0
     fi
     
     # 컨테이너 재시작
