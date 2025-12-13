@@ -101,12 +101,10 @@
         <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-bold">📊 변동성 분포</h2>
-                {% if chart_files|length > 1 %}
                 <button @click="showHistory = !showHistory" 
                         class="text-sm text-slate-400 hover:text-white flex items-center gap-1">
-                    <span x-text="showHistory ? '접기' : '📅 이전 차트 (' + {{ chart_files|length }} + ')'"></span>
+                    <span x-text="showHistory ? '접기' : '📅 차트 목록 ({{ chart_files|length }}개)'"></span>
                 </button>
-                {% endif %}
             </div>
             
             <div class="bg-slate-900 rounded-xl overflow-hidden">
@@ -117,10 +115,9 @@
             </div>
         </div>
         
-        <!-- 차트 히스토리 (여러개인 경우만) -->
-        {% if chart_files|length > 1 %}
+        <!-- 차트 히스토리 -->
         <div x-show="showHistory" x-transition class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-            <h3 class="text-sm font-medium text-slate-400 mb-3">📅 이전 차트</h3>
+            <h3 class="text-sm font-medium text-slate-400 mb-3">📅 일자별 차트</h3>
             
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {% for chart in chart_files %}
@@ -135,7 +132,6 @@
                 {% endfor %}
             </div>
         </div>
-        {% endif %}
     </div>
     {% else %}
     <div class="text-center py-12 bg-slate-800 rounded-2xl border border-slate-700">
