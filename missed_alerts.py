@@ -4,7 +4,7 @@
 """
 from datetime import datetime, timedelta
 from database import StockDatabase
-from notification import NotificationManager
+from notification import send_notification
 
 
 def send_missed_alerts_summary():
@@ -94,8 +94,11 @@ def send_missed_alerts_summary():
         
         # ntfy로 전송
         try:
-            NotificationManager.send_message(user['id'], message, "🌙 밤 사이 놓친 알림")
-            print(f"  ✅ {user['name']}님에게 전송: {len(user_missed)}건")
+            result = send_notification(user['id'], message, title="🌙 밤 사이 놓친 알림")
+            if result:
+                print(f"  ✅ {user['name']}님에게 전송: {len(user_missed)}건")
+            else:
+                print(f"  ⚠️ {user['name']}님 전송 실패 (ntfy 토픽 미설정?)")
         except Exception as e:
             print(f"  ❌ {user['name']}님 전송 실패: {e}")
     
