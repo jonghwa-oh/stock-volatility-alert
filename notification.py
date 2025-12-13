@@ -116,8 +116,9 @@ def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
     cursor = conn.cursor()
     
     # 해당 종목을 관심 종목으로 등록하고, ntfy 토픽이 설정된 활성 사용자 조회
+    # 사용자별 종목 투자금액도 함께 조회
     cursor.execute('''
-        SELECT DISTINCT u.id, u.ntfy_topic 
+        SELECT DISTINCT u.id, u.ntfy_topic, uw.investment_amount
         FROM users u
         JOIN user_watchlist uw ON u.id = uw.user_id
         WHERE u.enabled = 1 
@@ -138,15 +139,16 @@ def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
     base_url = os.environ.get('WEB_BASE_URL', '')
     
     success_count = 0
-    for user_id, topic in users:
+    for user_id, topic, investment_amount in users:
         if topic:
             ntfy = NtfyAlert(topic)
             if ntfy.send_stock_alert(
                 ticker, name, current_price, target_price, 
-                signal_type, sigma, country=country, base_url=base_url
+                signal_type, sigma, country=country, base_url=base_url,
+                investment_amount=investment_amount
             ):
                 success_count += 1
-                print(f"✅ 사용자 {user_id}에게 {ticker} 알림 전송 완료")
+                print(f"✅ 사용자 {user_id}에게 {ticker} 알림 전송 완료 (투자금액: {investment_amount})")
     
     return success_count
 

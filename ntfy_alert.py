@@ -83,7 +83,8 @@ class NtfyAlert:
                          signal_type: str = "매수",
                          sigma: float = 1.0,
                          country: str = 'US',
-                         base_url: str = None) -> bool:
+                         base_url: str = None,
+                         investment_amount: float = None) -> bool:
         """
         주식 알림 전송
         
@@ -96,8 +97,10 @@ class NtfyAlert:
             sigma: 시그마 배수
             country: 국가 코드 (KR/US)
             base_url: 웹 대시보드 기본 URL (예: http://192.168.1.100:8080)
+            investment_amount: 투자금액 (한국: 원, 미국: 달러)
         """
         import os
+        import math
         
         # 이모지 태그 설정
         if "매수" in signal_type:
@@ -109,18 +112,31 @@ class NtfyAlert:
         
         title = f"📊 {name} {signal_type} 신호!"
         
-        # 가격 포맷 (한국: 천단위 쉼표, 미국: 소수점 2자리)
+        # 가격 포맷 (한국: 천단위 쉼표, 미국: 소수점 2자리 버림)
         if country == 'KR':
             price_fmt = f"{int(current_price):,}원"
             target_fmt = f"{int(target_price):,}원"
         else:
-            price_fmt = f"${current_price:,.2f}"
-            target_fmt = f"${target_price:,.2f}"
+            price_fmt = f"${math.floor(current_price * 100) / 100:,.2f}"
+            target_fmt = f"${math.floor(target_price * 100) / 100:,.2f}"
         
         message = f"""종목: {name} ({ticker})
 현재가: {price_fmt}
 목표가: {target_fmt} ({sigma}σ)
 신호: {signal_type}"""
+        
+        # 투자금액이 설정된 경우 매수 수량 계산
+        if investment_amount and investment_amount > 0 and current_price > 0:
+            shares = int(investment_amount / current_price)  # 소수점 버림
+            if country == 'KR':
+                invest_fmt = f"{int(investment_amount):,}원"
+            else:
+                invest_fmt = f"${investment_amount:,.0f}"
+            
+            if shares > 0:
+                message += f"\n\n💰 투자금액: {invest_fmt}\n📦 매수 수량: {shares}주"
+            else:
+                message += f"\n\n💰 투자금액: {invest_fmt}\n⚠️ 1주 미만 (금액 부족)"
         
         # 클릭 URL 생성 (환경변수 또는 파라미터로 설정)
         click_url = None
