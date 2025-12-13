@@ -86,25 +86,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # DLNA 서버 (MiniDLNA)
-  minidlna:
-    image: vladgh/minidlna:latest
-    container_name: minidlna
-    restart: unless-stopped
-    network_mode: "host"
-    volumes:
-      - ./media:/media:ro
-    environment:
-      - TZ=Asia/Seoul
-      - MINIDLNA_MEDIA_DIR=/media
-      - MINIDLNA_FRIENDLY_NAME=MacMini-Media
-      - MINIDLNA_INOTIFY=yes
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # 파일 공유 (Samba)
   samba:
     image: dperson/samba:latest
