@@ -16,11 +16,19 @@ def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
     try:
         data = analyze_daily_volatility(ticker, name, country=country)
         if data:
+            # 데이터 기준일 포맷팅
+            data_date = data.get('data_date')
+            if hasattr(data_date, 'strftime'):
+                data_date_str = data_date.strftime('%Y-%m-%d')
+            else:
+                data_date_str = str(data_date)[:10] if data_date else None
+            
             return {
                 'ticker': ticker,
                 'name': name,
                 'country': country,
                 'current_price': data['current_price'],
+                'data_date': data_date_str,  # 마지막 거래일 (해당 시장 기준)
                 'target_05x': data['target_05x'],
                 'target_1x': data['target_1x'],
                 'target_2x': data['target_2x'],

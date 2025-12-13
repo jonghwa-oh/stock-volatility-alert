@@ -352,6 +352,15 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, cou
     print("\n" + "="*70)
     
     # 데이터 반환 (시각화용)
+    # 마지막 거래일 (데이터 기준일)
+    last_date = close_prices.index[-1]
+    if hasattr(last_date, 'date'):
+        data_date = last_date.date()
+    elif hasattr(last_date, 'strftime'):
+        data_date = last_date
+    else:
+        data_date = str(last_date)[:10]
+    
     return {
         'ticker': ticker,
         'ticker_name': ticker_name,
@@ -360,6 +369,7 @@ def analyze_daily_volatility(ticker, ticker_name, investment_amount=1000000, cou
         'close_prices': close_prices,
         'daily_returns': daily_returns,
         'current_price': current_price,
+        'data_date': data_date,  # 마지막 거래일 (해당 시장 기준)
         'mean_return': mean_return,
         'std_return': std_return,
         'max_gain': max_gain,

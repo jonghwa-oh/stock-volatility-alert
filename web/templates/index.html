@@ -7,8 +7,8 @@
     <!-- 헤더 -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-bold">📊 오늘의 분석</h1>
-            <p class="text-slate-400 text-sm mt-1">{{ now.strftime('%Y년 %m월 %d일 %H:%M') }} 기준</p>
+            <h1 class="text-2xl font-bold">📊 종목 분석</h1>
+            <p class="text-slate-400 text-sm mt-1">조회: {{ now.strftime('%Y-%m-%d %H:%M') }} (각 종목별 기준일 참고)</p>
         </div>
         <a href="{{ url_for('stocks.add_stock') }}"
            class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
@@ -41,7 +41,13 @@
                         ${{ "{:,.2f}".format(stock.current_price) }}
                         {% endif %}
                     </p>
-                    <p class="text-sm text-slate-400">현재가</p>
+                    <p class="text-sm text-slate-400">
+                        {% if stock.data_date %}
+                        {{ stock.data_date }}{% if stock.country == 'US' %} (미국){% endif %} 종가
+                        {% else %}
+                        현재가
+                        {% endif %}
+                    </p>
                 </div>
                 {% endif %}
             </div>
