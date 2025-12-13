@@ -68,3 +68,6 @@ log "📌 접속: http://$(tailscale ip -4 2>/dev/null || echo 'NAS-IP'):8080"
 log "📌 로그: sudo docker logs stock_web -f"
 log ""
 
+
+
+

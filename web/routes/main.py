@@ -92,9 +92,16 @@ def settings():
     
     db = StockDatabase()
     user = db.get_user_by_name(username)
+    
+    # ntfy 설정 가져오기
+    ntfy_topic = db.get_setting('ntfy_topic', '')
+    notification_method = db.get_setting('notification_method', 'telegram')
+    
     db.close()
     
     return render_template('settings.html', 
                           username=username,
-                          user=user)
+                          user=user,
+                          ntfy_topic=ntfy_topic,
+                          notification_method=notification_method)
 

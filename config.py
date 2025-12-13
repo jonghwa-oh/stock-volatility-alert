@@ -15,6 +15,13 @@ def load_config():
         bot_token = db.get_setting('bot_token')
         default_chat_id = db.get_setting('default_chat_id')
         
+        # ntfy 설정
+        ntfy_topic = db.get_setting('ntfy_topic')
+        ntfy_server = db.get_setting('ntfy_server', 'https://ntfy.sh')
+        
+        # 알림 방식 설정 (telegram 또는 ntfy)
+        notification_method = db.get_setting('notification_method', 'telegram')
+        
         # 투자 설정
         default_amount = db.get_setting('default_investment_amount', '1000000')
         
@@ -25,6 +32,11 @@ def load_config():
                 'BOT_TOKEN': bot_token,
                 'CHAT_ID': default_chat_id,
             },
+            'NTFY_CONFIG': {
+                'TOPIC': ntfy_topic,
+                'SERVER': ntfy_server,
+            },
+            'NOTIFICATION_METHOD': notification_method,  # 'telegram' or 'ntfy'
             'INVESTMENT_CONFIG': {
                 'default_amount': int(default_amount),
             }
@@ -38,6 +50,11 @@ def load_config():
                 'BOT_TOKEN': None,
                 'CHAT_ID': None,
             },
+            'NTFY_CONFIG': {
+                'TOPIC': None,
+                'SERVER': 'https://ntfy.sh',
+            },
+            'NOTIFICATION_METHOD': 'telegram',
             'INVESTMENT_CONFIG': {
                 'default_amount': 1000000,
             }
@@ -47,6 +64,8 @@ def load_config():
 # 설정 로드
 _config = load_config()
 TELEGRAM_CONFIG = _config['TELEGRAM_CONFIG']
+NTFY_CONFIG = _config['NTFY_CONFIG']
+NOTIFICATION_METHOD = _config['NOTIFICATION_METHOD']
 INVESTMENT_CONFIG = _config['INVESTMENT_CONFIG']
 
 

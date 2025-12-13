@@ -330,6 +330,69 @@ def search_stocks():
     })
 
 
+@api_bp.route('/settings/ntfy', methods=['POST'])
+@login_required
+def save_ntfy_settings():
+    """ntfy 설정 저장 API"""
+    data = request.json
+    topic = data.get('topic', '')
+    method = data.get('method', 'telegram')
+    
+    db = StockDatabase()
+    
+    try:
+        if topic:
+            db.save_setting('ntfy_topic', topic, 'ntfy 토픽')
+        db.save_setting('notification_method', method, '알림 방식')
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '설정이 저장되었습니다.'
+        })
+    except Exception as e:
+        db.close()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/settings/ntfy/test', methods=['POST'])
+@login_required
+def test_ntfy():
+    """ntfy 테스트 알림 전송"""
+    data = request.json
+    topic = data.get('topic', '')
+    
+    if not topic:
+        return jsonify({
+            'success': False,
+            'error': '토픽을 입력해주세요.'
+        })
+    
+    try:
+        from ntfy_alert import NtfyAlert
+        ntfy = NtfyAlert(topic)
+        success = ntfy.test()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '테스트 알림이 전송되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '알림 전송에 실패했습니다.'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @api_bp.route('/verify/ticker')
 @login_required
 def verify_ticker():
