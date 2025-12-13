@@ -152,6 +152,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const country = '{{ stock_info.country if stock_info else "US" }}';
     const isKorean = country === 'KR';
     
+    // 가격 포맷 함수 (한국: 천단위 쉼표, 미국: 소수점 2자리 버림)
+    function formatPrice(value) {
+        if (isKorean) {
+            return Math.floor(value).toLocaleString() + '원';
+        }
+        return '$' + (Math.floor(value * 100) / 100).toFixed(2);
+    }
+    
     // 목표가 라인
     const targets = {
         target_05x: {{ analysis.target_05x if analysis else 0 }},
@@ -222,10 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     labels: {
                         formatter: function(value) {
-                            if (isKorean) {
-                                return value.toLocaleString() + '원';
-                            }
-                            return '$' + value.toFixed(2);
+                            return formatPrice(value);
                         }
                     }
                 },
@@ -242,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     color: '#000',
                                     background: '#eab308'
                                 },
-                                text: '0.5σ: ' + (isKorean ? targets.target_05x.toLocaleString() + '원' : '$' + targets.target_05x.toFixed(2))
+                                text: '0.5σ: ' + formatPrice(targets.target_05x)
                             }
                         },
                         {
@@ -256,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     color: '#fff',
                                     background: '#3b82f6'
                                 },
-                                text: '1σ: ' + (isKorean ? targets.target_1x.toLocaleString() + '원' : '$' + targets.target_1x.toFixed(2))
+                                text: '1σ: ' + formatPrice(targets.target_1x)
                             }
                         },
                         {
@@ -270,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     color: '#fff',
                                     background: '#a855f7'
                                 },
-                                text: '2σ: ' + (isKorean ? targets.target_2x.toLocaleString() + '원' : '$' + targets.target_2x.toFixed(2))
+                                text: '2σ: ' + formatPrice(targets.target_2x)
                             }
                         }
                     ]
@@ -297,10 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     y: {
                         formatter: function(value) {
-                            if (isKorean) {
-                                return value.toLocaleString() + '원';
-                            }
-                            return '$' + value.toFixed(2);
+                            return formatPrice(value);
                         }
                     }
                 }
