@@ -122,7 +122,6 @@ class StockDatabase:
                 name TEXT NOT NULL UNIQUE,
                 password_hash TEXT,
                 ntfy_topic TEXT,
-                investment_amount REAL DEFAULT 1000000,
                 enabled BOOLEAN DEFAULT 1,
                 notification_enabled BOOLEAN DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -558,16 +557,16 @@ class StockDatabase:
     # 사용자 관리
     # ========================================
     
-    def add_user(self, name: str, investment_amount: float = 1000000, ntfy_topic: str = None):
+    def add_user(self, name: str, ntfy_topic: str = None):
         """사용자 추가"""
         conn = self.connect()
         cursor = conn.cursor()
         
         try:
             cursor.execute('''
-                INSERT INTO users (name, investment_amount, ntfy_topic)
-                VALUES (?, ?, ?)
-            ''', (name, investment_amount, ntfy_topic))
+                INSERT INTO users (name, ntfy_topic)
+                VALUES (?, ?)
+            ''', (name, ntfy_topic))
             conn.commit()
             print(f"✅ 사용자 추가: {name}")
             return cursor.lastrowid
@@ -584,7 +583,7 @@ class StockDatabase:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, name, investment_amount, enabled, ntfy_topic
+            SELECT id, name, enabled, ntfy_topic
             FROM users WHERE name = ?
         ''', (name,))
         
@@ -593,7 +592,6 @@ class StockDatabase:
             return {
                 'id': result[0],
                 'name': result[1],
-                'investment_amount': result[2],
                 'enabled': result[3],
                 'ntfy_topic': result[4]
             }
@@ -606,12 +604,12 @@ class StockDatabase:
         
         if include_disabled:
             cursor.execute('''
-                SELECT id, name, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
+                SELECT id, name, enabled, notification_enabled, password_hash, ntfy_topic
                 FROM users
             ''')
         else:
             cursor.execute('''
-                SELECT id, name, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
+                SELECT id, name, enabled, notification_enabled, password_hash, ntfy_topic
                 FROM users WHERE enabled = 1
             ''')
         
@@ -620,7 +618,6 @@ class StockDatabase:
             users.append({
                 'id': row[0],
                 'name': row[1],
-                'investment_amount': row[2],
                 'enabled': row[3],
                 'notification_enabled': row[4] if row[4] is not None else 1,
                 'password_hash': row[5],
@@ -628,21 +625,7 @@ class StockDatabase:
             })
         return users
     
-    def update_user_investment(self, name: str, amount: float):
-        """사용자 투자 금액 변경"""
-        conn = self.connect()
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute('''
-                UPDATE users SET investment_amount = ? WHERE name = ?
-            ''', (amount, name))
-            conn.commit()
-            print(f"✅ {name} 투자 금액 변경: {amount:,.0f}원")
-            return True
-        except Exception as e:
-            print(f"❌ 투자 금액 변경 실패: {e}")
-            return False
+
     
     def add_user_watchlist(self, user_name: str, ticker: str, name: str = None, country: str = 'US', investment_amount: float = None):
         """사용자 관심 종목 추가
@@ -838,7 +821,7 @@ class StockDatabase:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, name, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
+            SELECT id, name, enabled, notification_enabled, password_hash, ntfy_topic
             FROM users WHERE name = ?
         ''', (name,))
         
@@ -847,7 +830,6 @@ class StockDatabase:
             return {
                 'id': result[0],
                 'name': result[1],
-                'investment_amount': result[2],
                 'enabled': result[3],
                 'notification_enabled': result[4] if result[4] is not None else 1,
                 'password_hash': result[5],
