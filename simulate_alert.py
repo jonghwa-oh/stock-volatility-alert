@@ -241,32 +241,39 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
         else:
             print(f"\n   ❌ {level_name} 알림 미발생 (목표가 미도달)")
     
-    # 5. 실제 알림 발송 (옵션)
+    # 5. 실제 알림 발송 (옵션) - 새로운 알림 시스템 사용
     if send_alert and alert_count > 0:
-        print(f"\n[5] 📤 실제 알림 발송...")
+        print(f"\n[5] 📤 실제 알림 발송 (실제 알림 시스템 사용)...")
         
-        users = db.get_all_users()
-        for user in users:
-            ntfy_topic = user.get('ntfy_topic')
-            if not ntfy_topic:
-                continue
-            
-            ntfy = NtfyAlert(ntfy_topic)
-            
-            # 시뮬레이션 결과 알림
-            message = f"📊 {target_date} 알림 시뮬레이션 결과\n\n"
-            message += f"종목: {name} ({ticker})\n"
-            message += f"당일 등락: {day_change:+.2f}%\n\n"
-            
-            for level, alert in alerts_triggered.items():
-                level_name = {'05x': '0.5σ', '1x': '1σ', '2x': '2σ'}[level]
-                if alert:
-                    message += f"✅ {level_name}: {alert['time'][11:16]} @ ${alert['price']:.2f}\n"
+        from notification import send_stock_alert_to_all
+        import os
+        
+        # 발생한 알림 중 하나만 실제로 발송 (가장 낮은 레벨)
+        for level in ['05x', '1x', '2x']:
+            alert = alerts_triggered[level]
+            if alert:
+                level_name = {'05x': '🧪 테스트', '1x': '1차', '2x': '2차'}[level]
+                sigma = {'05x': 0.5, '1x': 1.0, '2x': 2.0}[level]
+                
+                print(f"\n   📤 {level_name} 알림 발송 중...")
+                
+                # 실제 알림 시스템 사용 (투자금액 + 링크 포함)
+                success_count = send_stock_alert_to_all(
+                    ticker=ticker,
+                    name=name,
+                    current_price=alert['price'],
+                    target_price=alert['target'],
+                    signal_type=f"{level_name} 매수 (시뮬레이션)",
+                    sigma=sigma,
+                    country=country
+                )
+                
+                if success_count > 0:
+                    print(f"   ✅ {success_count}명에게 알림 발송 완료!")
                 else:
-                    message += f"❌ {level_name}: 미도달\n"
-            
-            result = ntfy.send(message, title=f"📈 {ticker} 시뮬레이션")
-            print(f"   {user['name']}: {'✅ 발송 성공' if result else '❌ 발송 실패'}")
+                    print(f"   ⚠️ 알림 대상자 없음 ({ticker} 관심 종목 등록 필요)")
+                
+                break  # 가장 낮은 레벨만 발송
     
     print(f"\n{'='*60}")
     print(f"✅ 시뮬레이션 완료! 총 {alert_count}건 알림 발생")
