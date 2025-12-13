@@ -27,7 +27,7 @@ class NtfyAlert:
              tags: Optional[list] = None,
              click_url: Optional[str] = None) -> bool:
         """
-        알림 전송
+        알림 전송 (JSON 방식 - 유니코드/이모지 지원)
         
         Args:
             message: 알림 메시지
@@ -39,25 +39,28 @@ class NtfyAlert:
         Returns:
             성공 여부
         """
-        headers = {}
+        # JSON body 방식 사용 (이모지/유니코드 지원)
+        payload = {
+            "topic": self.topic,
+            "message": message
+        }
         
         if title:
-            headers["Title"] = title
+            payload["title"] = title
         
         if priority != 3:
-            headers["Priority"] = str(priority)
+            payload["priority"] = priority
         
         if tags:
-            headers["Tags"] = ",".join(tags)
+            payload["tags"] = tags
         
         if click_url:
-            headers["Click"] = click_url
+            payload["click"] = click_url
         
         try:
             response = requests.post(
-                self.url,
-                data=message.encode('utf-8'),
-                headers=headers,
+                self.server,
+                json=payload,
                 timeout=10
             )
             
