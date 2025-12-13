@@ -830,10 +830,10 @@ class StockDatabase:
             return {
                 'id': result[0],
                 'name': result[1],
-                'enabled': result[3],
-                'notification_enabled': result[4] if result[4] is not None else 1,
-                'password_hash': result[5],
-                'ntfy_topic': result[6]
+                'enabled': result[2],
+                'notification_enabled': result[3] if result[3] is not None else 1,
+                'password_hash': result[4],
+                'ntfy_topic': result[5]
             }
         return None
     
