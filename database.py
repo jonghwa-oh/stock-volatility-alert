@@ -82,16 +82,38 @@ class StockDatabase:
             CREATE TABLE IF NOT EXISTS statistics_cache (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ticker TEXT NOT NULL,
+                ticker_name TEXT,
+                country TEXT DEFAULT 'US',
                 date DATE NOT NULL,
+                data_date DATE,
                 mean_return REAL,
                 std_dev REAL,
                 current_price REAL,
+                target_05sigma REAL,
                 target_1sigma REAL,
                 target_2sigma REAL,
+                drop_05x REAL,
+                drop_1x REAL,
+                drop_2x REAL,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(ticker, date)
             )
         ''')
+        
+        # statistics_cache 컬럼 추가 (기존 테이블)
+        for col, col_type in [
+            ('ticker_name', 'TEXT'),
+            ('country', 'TEXT DEFAULT "US"'),
+            ('data_date', 'DATE'),
+            ('target_05sigma', 'REAL'),
+            ('drop_05x', 'REAL'),
+            ('drop_1x', 'REAL'),
+            ('drop_2x', 'REAL')
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE statistics_cache ADD COLUMN {col} {col_type}")
+            except:
+                pass
         
         # 사용자 테이블
         cursor.execute('''
@@ -382,17 +404,24 @@ class StockDatabase:
     def update_statistics_cache(self, ticker: str, date: str, 
                                 mean_return: float, std_dev: float,
                                 current_price: float, target_1sigma: float, 
-                                target_2sigma: float):
-        """통계 캐시 업데이트"""
+                                target_2sigma: float, ticker_name: str = None,
+                                country: str = 'US', data_date: str = None,
+                                target_05sigma: float = None, drop_05x: float = None,
+                                drop_1x: float = None, drop_2x: float = None):
+        """통계 캐시 업데이트 (확장)"""
         conn = self.connect()
         cursor = conn.cursor()
         
         try:
             cursor.execute('''
                 INSERT OR REPLACE INTO statistics_cache 
-                (ticker, date, mean_return, std_dev, current_price, target_1sigma, target_2sigma)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (ticker, date, mean_return, std_dev, current_price, target_1sigma, target_2sigma))
+                (ticker, ticker_name, country, date, data_date, mean_return, std_dev, 
+                 current_price, target_05sigma, target_1sigma, target_2sigma,
+                 drop_05x, drop_1x, drop_2x)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (ticker, ticker_name, country, date, data_date, mean_return, std_dev, 
+                  current_price, target_05sigma, target_1sigma, target_2sigma,
+                  drop_05x, drop_1x, drop_2x))
             conn.commit()
             return True
         except Exception as e:
@@ -400,7 +429,7 @@ class StockDatabase:
             return False
     
     def get_statistics_cache(self, ticker: str, date: str = None) -> Dict:
-        """통계 캐시 조회"""
+        """통계 캐시 조회 (확장)"""
         conn = self.connect()
         cursor = conn.cursor()
         
@@ -408,7 +437,9 @@ class StockDatabase:
             date = datetime.now().strftime('%Y-%m-%d')
         
         cursor.execute('''
-            SELECT mean_return, std_dev, current_price, target_1sigma, target_2sigma, updated_at
+            SELECT ticker_name, country, data_date, mean_return, std_dev, current_price, 
+                   target_05sigma, target_1sigma, target_2sigma,
+                   drop_05x, drop_1x, drop_2x, updated_at
             FROM statistics_cache
             WHERE ticker = ? AND date = ?
         ''', (ticker, date))
@@ -417,12 +448,21 @@ class StockDatabase:
         
         if result:
             return {
-                'mean_return': result[0],
-                'std_dev': result[1],
-                'current_price': result[2],
-                'target_1sigma': result[3],
-                'target_2sigma': result[4],
-                'updated_at': result[5]
+                'ticker_name': result[0],
+                'country': result[1],
+                'data_date': result[2],
+                'mean_return': result[3],
+                'std_dev': result[4],
+                'std_return': result[4],  # 호환성
+                'current_price': result[5],
+                'target_05x': result[6],
+                'target_1x': result[7],
+                'target_2x': result[8],
+                'drop_05x': result[9],
+                'drop_1x': result[10],
+                'drop_2x': result[11],
+                'updated_at': result[12],
+                'from_cache': True
             }
         return None
     

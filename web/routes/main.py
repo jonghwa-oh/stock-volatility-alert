@@ -12,8 +12,36 @@ main_bp = Blueprint('main', __name__)
 
 
 def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
-    """종목 분석 데이터 조회"""
+    """종목 분석 데이터 조회 (캐시 우선)"""
+    db = StockDatabase()
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    # 1. 캐시 확인 (당일 데이터)
+    cached = db.get_statistics_cache(ticker, today)
+    if cached and cached.get('current_price'):
+        print(f"  📦 [{ticker}] 캐시 사용")
+        db.close()
+        return {
+            'ticker': ticker,
+            'name': cached.get('ticker_name') or name,
+            'country': cached.get('country') or country,
+            'current_price': cached['current_price'],
+            'data_date': cached.get('data_date'),
+            'target_05x': cached.get('target_05x'),
+            'target_1x': cached.get('target_1x'),
+            'target_2x': cached.get('target_2x'),
+            'drop_05x': cached.get('drop_05x'),
+            'drop_1x': cached.get('drop_1x'),
+            'drop_2x': cached.get('drop_2x'),
+            'std_return': cached.get('std_return'),
+            'volatility': cached.get('std_return'),
+            'success': True,
+            'from_cache': True
+        }
+    
+    # 2. 캐시 없으면 실시간 분석
     try:
+        print(f"  📊 [{ticker}] 실시간 분석 중...")
         data = analyze_daily_volatility(ticker, name, country=country)
         if data:
             # 데이터 기준일 포맷팅
@@ -23,12 +51,32 @@ def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
             else:
                 data_date_str = str(data_date)[:10] if data_date else None
             
+            # 캐시 저장
+            db.update_statistics_cache(
+                ticker=ticker,
+                date=today,
+                ticker_name=name,
+                country=country,
+                data_date=data_date_str,
+                mean_return=data.get('mean_return'),
+                std_dev=data['std_return'],
+                current_price=data['current_price'],
+                target_05sigma=data['target_05x'],
+                target_1sigma=data['target_1x'],
+                target_2sigma=data['target_2x'],
+                drop_05x=data['drop_05x'],
+                drop_1x=data['drop_1x'],
+                drop_2x=data['drop_2x']
+            )
+            print(f"  💾 [{ticker}] 캐시 저장 완료")
+            
+            db.close()
             return {
                 'ticker': ticker,
                 'name': name,
                 'country': country,
                 'current_price': data['current_price'],
-                'data_date': data_date_str,  # 마지막 거래일 (해당 시장 기준)
+                'data_date': data_date_str,
                 'target_05x': data['target_05x'],
                 'target_1x': data['target_1x'],
                 'target_2x': data['target_2x'],
@@ -36,7 +84,7 @@ def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
                 'drop_1x': data['drop_1x'],
                 'drop_2x': data['drop_2x'],
                 'std_return': data['std_return'],
-                'volatility': data['std_return'],  # 이미 퍼센트 값
+                'volatility': data['std_return'],
                 'success': True
             }
     except Exception as e:
@@ -44,6 +92,7 @@ def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
         import traceback
         traceback.print_exc()
     
+    db.close()
     return {
         'ticker': ticker,
         'name': name,
