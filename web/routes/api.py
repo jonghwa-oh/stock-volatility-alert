@@ -333,17 +333,17 @@ def search_stocks():
 @api_bp.route('/settings/ntfy', methods=['POST'])
 @login_required
 def save_ntfy_settings():
-    """ntfy 설정 저장 API"""
+    """ntfy 설정 저장 API (사용자별)"""
+    username = session.get('user')
     data = request.json
     topic = data.get('topic', '')
-    method = data.get('method', 'telegram')
     
     db = StockDatabase()
     
     try:
+        # 사용자별 ntfy 토픽 저장
         if topic:
-            db.save_setting('ntfy_topic', topic, 'ntfy 토픽')
-        db.save_setting('notification_method', method, '알림 방식')
+            db.set_user_ntfy_topic(username, topic)
         db.close()
         
         return jsonify({

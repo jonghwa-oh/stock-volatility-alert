@@ -1,164 +1,73 @@
 """
-통합 알림 모듈
-설정에 따라 Telegram 또는 ntfy로 알림 전송
+통합 알림 모듈 (ntfy 전용)
+사용자별 ntfy 토픽으로 알림 전송
 """
 from database import StockDatabase
+from ntfy_alert import NtfyAlert
 
 
-def send_notification(user_id: int, message: str, title: str = None, photo_path: str = None) -> bool:
+def send_notification(user_id: int, message: str, title: str = None) -> bool:
     """
-    사용자에게 알림 전송 (설정에 따라 telegram 또는 ntfy)
+    사용자에게 ntfy 알림 전송
     
     Args:
         user_id: 사용자 ID
         message: 알림 메시지
-        title: 알림 제목 (ntfy용)
-        photo_path: 이미지 경로 (telegram용)
+        title: 알림 제목
     
     Returns:
         성공 여부
     """
     db = StockDatabase()
     
-    # 알림 방식 확인
-    notification_method = db.get_setting('notification_method', 'telegram')
+    # 사용자별 ntfy 토픽 조회
+    topic = db.get_user_ntfy_topic(user_id)
+    db.close()
     
-    if notification_method == 'ntfy':
-        return _send_ntfy(db, message, title)
-    else:
-        return _send_telegram(db, user_id, message, photo_path)
-
-
-def _send_telegram(db: StockDatabase, user_id: int, message: str, photo_path: str = None) -> bool:
-    """텔레그램으로 알림 전송"""
-    try:
-        from telegram_bot import send_telegram_sync
-        
-        bot_token = db.get_setting('bot_token')
-        
-        # 사용자 chat_id 조회
-        conn = db.connect()
-        cursor = conn.cursor()
-        cursor.execute('SELECT chat_id FROM users WHERE id = ?', (user_id,))
-        row = cursor.fetchone()
-        
-        if not row:
-            print(f"❌ 사용자 {user_id}를 찾을 수 없습니다.")
-            db.close()
-            return False
-        
-        chat_id = row[0]
-        db.close()
-        
-        if not bot_token or not chat_id:
-            print("❌ 텔레그램 설정이 없습니다.")
-            return False
-        
-        send_telegram_sync(bot_token, chat_id, message=message, photo_path=photo_path)
-        return True
-        
-    except Exception as e:
-        print(f"❌ 텔레그램 전송 실패: {e}")
-        db.close()
+    if not topic:
+        print(f"❌ 사용자 {user_id}의 ntfy 토픽이 설정되지 않았습니다.")
         return False
-
-
-def _send_ntfy(db: StockDatabase, message: str, title: str = None) -> bool:
-    """ntfy로 알림 전송"""
-    try:
-        from ntfy_alert import NtfyAlert
-        
-        topic = db.get_setting('ntfy_topic')
-        server = db.get_setting('ntfy_server', 'https://ntfy.sh')
-        db.close()
-        
-        if not topic:
-            print("❌ ntfy 토픽이 설정되지 않았습니다.")
-            return False
-        
-        ntfy = NtfyAlert(topic, server)
-        return ntfy.send(message, title=title, priority=4)
-        
-    except Exception as e:
-        print(f"❌ ntfy 전송 실패: {e}")
-        db.close()
-        return False
+    
+    ntfy = NtfyAlert(topic)
+    return ntfy.send(message, title=title, priority=4)
 
 
 def send_stock_alert(user_id: int, ticker: str, name: str, current_price: float, 
-                     target_price: float, signal_type: str = "매수", sigma: float = 1.0) -> bool:
+                     target_price: float, signal_type: str = "매수", sigma: float = 1.0,
+                     country: str = 'US') -> bool:
     """
     주식 알림 전송
     """
     db = StockDatabase()
-    notification_method = db.get_setting('notification_method', 'telegram')
+    topic = db.get_user_ntfy_topic(user_id)
+    db.close()
     
-    if notification_method == 'ntfy':
-        try:
-            from ntfy_alert import NtfyAlert
-            
-            topic = db.get_setting('ntfy_topic')
-            server = db.get_setting('ntfy_server', 'https://ntfy.sh')
-            db.close()
-            
-            if not topic:
-                print("❌ ntfy 토픽이 설정되지 않았습니다.")
-                return False
-            
-            ntfy = NtfyAlert(topic, server)
-            return ntfy.send_stock_alert(ticker, name, current_price, target_price, signal_type, sigma)
-            
-        except Exception as e:
-            print(f"❌ ntfy 주식 알림 실패: {e}")
-            db.close()
-            return False
-    else:
-        # 텔레그램 메시지 포맷
-        message = f"""🚨 {signal_type} 신호!
-
-📊 {name} ({ticker})
-💰 현재가: ${current_price:,.2f}
-🎯 목표가: ${target_price:,.2f} ({sigma}σ)
-📈 신호: {signal_type}"""
-        
-        return _send_telegram(db, user_id, message)
+    if not topic:
+        print(f"❌ 사용자 {user_id}의 ntfy 토픽이 설정되지 않았습니다.")
+        return False
+    
+    ntfy = NtfyAlert(topic)
+    
+    # 통화 기호 결정
+    currency = '₩' if country == 'KR' else '$'
+    
+    return ntfy.send_stock_alert(ticker, name, current_price, target_price, signal_type, sigma)
 
 
-def send_morning_report(user_id: int, report: str, photo_path: str = None) -> bool:
+def send_morning_report(user_id: int, report: str) -> bool:
     """
     아침 리포트 전송
     """
     db = StockDatabase()
-    notification_method = db.get_setting('notification_method', 'telegram')
+    topic = db.get_user_ntfy_topic(user_id)
+    db.close()
     
-    if notification_method == 'ntfy':
-        try:
-            from ntfy_alert import NtfyAlert
-            
-            topic = db.get_setting('ntfy_topic')
-            server = db.get_setting('ntfy_server', 'https://ntfy.sh')
-            db.close()
-            
-            if not topic:
-                return False
-            
-            ntfy = NtfyAlert(topic, server)
-            return ntfy.send_morning_report(report)
-            
-        except Exception as e:
-            print(f"❌ ntfy 리포트 실패: {e}")
-            db.close()
-            return False
-    else:
-        return _send_telegram(db, user_id, report, photo_path)
-
-
-# 간편 함수
-def notify(message: str, title: str = None) -> bool:
-    """
-    기본 사용자에게 알림 전송 (user_id 1번)
-    """
-    return send_notification(1, message, title)
+    if not topic:
+        print(f"❌ 사용자 {user_id}의 ntfy 토픽이 설정되지 않았습니다.")
+        return False
+    
+    ntfy = NtfyAlert(topic)
+    return ntfy.send_morning_report(report)
 
 
 def notify_all_users(message: str, title: str = None) -> int:
@@ -172,14 +81,70 @@ def notify_all_users(message: str, title: str = None) -> int:
     
     conn = db.connect()
     cursor = conn.cursor()
-    cursor.execute('SELECT id FROM users WHERE enabled = 1 AND notification_enabled = 1')
+    cursor.execute('''
+        SELECT id, ntfy_topic FROM users 
+        WHERE enabled = 1 AND notification_enabled = 1 AND ntfy_topic IS NOT NULL
+    ''')
     users = cursor.fetchall()
     db.close()
     
     success_count = 0
-    for (user_id,) in users:
-        if send_notification(user_id, message, title):
-            success_count += 1
+    for user_id, topic in users:
+        if topic:
+            ntfy = NtfyAlert(topic)
+            if ntfy.send(message, title=title, priority=4):
+                success_count += 1
     
     return success_count
 
+
+def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
+                            target_price: float, signal_type: str = "매수", 
+                            sigma: float = 1.0, country: str = 'US') -> int:
+    """
+    모든 활성 사용자에게 주식 알림 전송
+    (해당 종목을 관심 종목으로 등록한 사용자만)
+    
+    Returns:
+        성공한 사용자 수
+    """
+    db = StockDatabase()
+    
+    conn = db.connect()
+    cursor = conn.cursor()
+    
+    # 해당 종목을 관심 종목으로 등록하고, ntfy 토픽이 설정된 활성 사용자 조회
+    cursor.execute('''
+        SELECT DISTINCT u.id, u.ntfy_topic 
+        FROM users u
+        JOIN user_watchlist uw ON u.id = uw.user_id
+        WHERE u.enabled = 1 
+          AND u.notification_enabled = 1 
+          AND u.ntfy_topic IS NOT NULL
+          AND uw.ticker = ?
+          AND uw.enabled = 1
+    ''', (ticker,))
+    
+    users = cursor.fetchall()
+    db.close()
+    
+    if not users:
+        print(f"⚠️ {ticker} 종목을 관심 종목으로 등록한 활성 사용자가 없습니다.")
+        return 0
+    
+    success_count = 0
+    for user_id, topic in users:
+        if topic:
+            ntfy = NtfyAlert(topic)
+            if ntfy.send_stock_alert(ticker, name, current_price, target_price, signal_type, sigma):
+                success_count += 1
+                print(f"✅ 사용자 {user_id}에게 {ticker} 알림 전송 완료")
+    
+    return success_count
+
+
+# 테스트
+if __name__ == "__main__":
+    # 모든 사용자에게 테스트 알림
+    count = notify_all_users("테스트 알림입니다! 🎉", "📊 주식 알림 테스트")
+    print(f"✅ {count}명에게 알림 전송 완료")

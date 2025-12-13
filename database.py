@@ -109,6 +109,13 @@ class StockDatabase:
             # 이미 컬럼이 존재하면 무시
             pass
         
+        # ntfy_topic 컬럼 추가 (사용자별 ntfy 토픽)
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN ntfy_topic TEXT")
+        except sqlite3.OperationalError:
+            # 이미 컬럼이 존재하면 무시
+            pass
+        
         # 사용자별 관심 종목 테이블
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_watchlist (
@@ -503,12 +510,12 @@ class StockDatabase:
         
         if include_disabled:
             cursor.execute('''
-                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash
+                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
                 FROM users
             ''')
         else:
             cursor.execute('''
-                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash
+                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
                 FROM users WHERE enabled = 1
             ''')
         
@@ -521,7 +528,8 @@ class StockDatabase:
                 'investment_amount': row[3],
                 'enabled': row[4],
                 'notification_enabled': row[5] if row[5] is not None else 1,
-                'password_hash': row[6]
+                'password_hash': row[6],
+                'ntfy_topic': row[7]
             })
         return users
     
@@ -706,7 +714,7 @@ class StockDatabase:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash
+            SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
             FROM users WHERE name = ?
         ''', (name,))
         
@@ -719,9 +727,35 @@ class StockDatabase:
                 'investment_amount': result[3],
                 'enabled': result[4],
                 'notification_enabled': result[5] if result[5] is not None else 1,
-                'password_hash': result[6]
+                'password_hash': result[6],
+                'ntfy_topic': result[7]
             }
         return None
+    
+    def set_user_ntfy_topic(self, name: str, ntfy_topic: str) -> bool:
+        """사용자 ntfy 토픽 설정"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                UPDATE users SET ntfy_topic = ? WHERE name = ?
+            ''', (ntfy_topic, name))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ ntfy 토픽 설정 실패: {e}")
+            return False
+    
+    def get_user_ntfy_topic(self, user_id: int) -> str:
+        """사용자 ntfy 토픽 조회"""
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT ntfy_topic FROM users WHERE id = ?', (user_id,))
+        result = cursor.fetchone()
+        
+        return result[0] if result and result[0] else None
     
     def verify_user_password(self, name: str, password_hash: str) -> bool:
         """사용자 비밀번호 확인"""

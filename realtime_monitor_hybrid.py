@@ -10,7 +10,7 @@ from pathlib import Path
 from kis_websocket import KISWebSocket
 from database import StockDatabase
 from volatility_analysis import analyze_daily_volatility
-from telegram_bot import send_telegram_sync
+from ntfy_alert import NtfyAlert
 from config import load_config
 import FinanceDataReader as fdr
 import os
@@ -24,7 +24,6 @@ class HybridRealtimeMonitor:
         self.db = StockDatabase()
         self.ws = None  # WebSocket (한국 주식용)
         self.config = load_config()
-        self.telegram_config = self.config['TELEGRAM_CONFIG']
         
         # 종목별 매수 목표가 캐시
         self.target_prices = {}  # {ticker: {'1x': price, '2x': price, 'name': name, 'country': country}}
@@ -317,14 +316,28 @@ class HybridRealtimeMonitor:
                     continue
                 
                 try:
-                    log_debug(f"  📤 [{ticker}] {user['name']}님에게 알림 전송 시도...")
-                    send_telegram_sync(
-                        self.telegram_config['BOT_TOKEN'],
-                        user['chat_id'],
-                        message=message
+                    # 사용자별 ntfy 토픽으로 알림 전송
+                    ntfy_topic = user.get('ntfy_topic')
+                    if not ntfy_topic:
+                        log_warning(f"  ⚠️ [{ticker}] {user['name']} - ntfy 토픽 미설정 (건너뜀)")
+                        continue
+                    
+                    log_debug(f"  📤 [{ticker}] {user['name']}님에게 ntfy 알림 전송 시도...")
+                    ntfy = NtfyAlert(ntfy_topic)
+                    success = ntfy.send_stock_alert(
+                        ticker=ticker,
+                        name=name,
+                        current_price=current_price,
+                        target_price=target_price,
+                        signal_type="매수",
+                        sigma=float(level.replace('x', ''))
                     )
-                    log_success(f"  ✅ [{ticker}] {user['name']}님에게 {level_text} 매수 알림 전송 완료!")
-                    sent_to_users.append(user['name'])
+                    
+                    if success:
+                        log_success(f"  ✅ [{ticker}] {user['name']}님에게 {level_text} 매수 알림 전송 완료!")
+                        sent_to_users.append(user['name'])
+                    else:
+                        log_error(f"  ❌ [{ticker}] {user['name']}님 알림 전송 실패")
                     
                 except Exception as e:
                     log_error(f"  ❌ [{ticker}] {user['name']}님 알림 전송 실패: {e}")
