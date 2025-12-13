@@ -110,31 +110,7 @@ else
     exit 1
 fi
 
-# 4. 텔레그램 봇 커맨드 핸들러 백그라운드 실행
-log ""
-log "=================================="
-log "🤖 텔레그램 봇 커맨드 핸들러 시작"
-log "=================================="
-python telegram_bot_commands.py > /app/logs/telegram_bot.log 2>&1 &
-BOT_PID=$!
-log "✅ 봇 시작 완료!"
-log "   PID: $BOT_PID"
-log "   로그: /app/logs/telegram_bot.log"
-sleep 3
-
-# 프로세스 확인 (kill -0은 ps 명령어가 없어도 작동)
-if kill -0 $BOT_PID 2>/dev/null; then
-    log "✅ 텔레그램 봇 정상 실행 중"
-    log ""
-    log "📋 봇 초기화 로그:"
-    tail -20 /app/logs/telegram_bot.log
-else
-    log "❌ 텔레그램 봇 시작 실패!"
-    cat /app/logs/telegram_bot.log
-    exit 1
-fi
-
-# 5. 실시간 모니터링 시작
+# 4. 실시간 모니터링 시작
 log ""
 log "=================================="
 log "🎯 실시간 모니터링 시작"
@@ -150,6 +126,5 @@ log "=================================="
 log "⚠️  종료 중..."
 log "=================================="
 kill $UPDATER_PID 2>/dev/null && log "✅ 스케줄러 종료"
-kill $BOT_PID 2>/dev/null && log "✅ 봇 종료"
 log "👋 정상 종료되었습니다."
 

@@ -2,7 +2,6 @@ finance-datareader>=0.9.50
 pandas>=2.2.0
 numpy>=1.26.0
 matplotlib>=3.8.0
-python-telegram-bot>=20.0
 schedule>=1.2.0
 cryptography>=41.0.0
 requests>=2.31.0
