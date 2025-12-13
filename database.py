@@ -966,7 +966,7 @@ class StockDatabase:
     
     def record_alert(self, user_id: int, ticker: str, ticker_name: str, country: str,
                      alert_level: str, target_price: float, current_price: float, 
-                     drop_rate: float, sent: bool = True) -> bool:
+                     drop_rate: float, sent: bool = True, alert_date: str = None) -> bool:
         """알림 기록 저장 (중복 시 무시)
         
         Args:
@@ -979,6 +979,7 @@ class StockDatabase:
             current_price: 현재가
             drop_rate: 하락률
             sent: 발송 여부
+            alert_date: 알림 날짜 (None이면 오늘)
         
         Returns:
             True: 저장 성공 (새로운 알림), False: 중복으로 스킵
@@ -988,7 +989,7 @@ class StockDatabase:
         conn = self.connect()
         cursor = conn.cursor()
         
-        today = date.today().isoformat()
+        today = alert_date or date.today().isoformat()
         now = datetime.now().isoformat()
         
         try:

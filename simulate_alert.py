@@ -267,7 +267,8 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
                     country=country,
                     prev_close=prev_close,
                     alert_level=level,
-                    drop_rate=alert['drop']
+                    drop_rate=alert['drop'],
+                    alert_date=target_date  # 시뮬레이션 날짜 전달
                 )
                 
                 if success_count > 0:

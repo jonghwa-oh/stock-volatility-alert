@@ -102,14 +102,18 @@ def send_stock_alert_to_all_with_check(ticker: str, name: str, current_price: fl
                                        target_price: float, signal_type: str = "1차 매수", 
                                        sigma: float = 1.0, country: str = 'US',
                                        prev_close: float = None, alert_level: str = '1x',
-                                       drop_rate: float = 0) -> tuple:
+                                       drop_rate: float = 0, alert_date: str = None) -> tuple:
     """
     모든 활성 사용자에게 주식 알림 전송 (중복 체크 + DB 저장 포함)
+    
+    Args:
+        alert_date: 알림 날짜 (None이면 오늘, 시뮬레이션 시 지정)
     
     Returns:
         (success_count, skip_count) 튜플
     """
     import os
+    from datetime import date
     
     db = StockDatabase()
     
@@ -135,6 +139,9 @@ def send_stock_alert_to_all_with_check(ticker: str, name: str, current_price: fl
     
     base_url = os.environ.get('WEB_BASE_URL', '')
     
+    # 알림 날짜 (기본값: 오늘)
+    today = alert_date or date.today().isoformat()
+    
     success_count = 0
     skip_count = 0
     
@@ -152,7 +159,8 @@ def send_stock_alert_to_all_with_check(ticker: str, name: str, current_price: fl
             target_price=target_price,
             current_price=current_price,
             drop_rate=drop_rate,
-            sent=True
+            sent=True,
+            alert_date=today
         )
         
         if not saved:
