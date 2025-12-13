@@ -45,8 +45,9 @@ services:
     restart: unless-stopped
     command: python -m flask --app web.app:create_app run --host=0.0.0.0 --port=8080
     
-    # Tailscale 접근을 위해 호스트 네트워크 사용
-    network_mode: host
+    # 포트 매핑 (Colima/macOS 호환)
+    ports:
+      - "8080:8080"
     
     volumes:
       - ./data:/app/data
