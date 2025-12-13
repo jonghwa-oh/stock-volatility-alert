@@ -992,6 +992,16 @@ class StockDatabase:
         today = alert_date or date.today().isoformat()
         now = datetime.now().isoformat()
         
+        # 먼저 중복 체크 (UNIQUE 제약이 없는 기존 테이블 호환)
+        cursor.execute('''
+            SELECT id FROM alert_history 
+            WHERE user_id = ? AND ticker = ? AND alert_date = ? AND alert_level = ?
+        ''', (user_id, ticker, today, alert_level))
+        
+        if cursor.fetchone() is not None:
+            # 이미 존재하면 스킵
+            return False
+        
         try:
             cursor.execute('''
                 INSERT INTO alert_history 
