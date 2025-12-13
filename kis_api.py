@@ -462,6 +462,90 @@ class KISApi:
         except Exception as e:
             return None
     
+    def get_kr_minute_price(self, ticker: str, date: str, interval: int = 1) -> list:
+        """
+        한국 주식 분봉 조회
+        
+        Args:
+            ticker: 종목코드 (6자리)
+            date: 조회일 (YYYYMMDD)
+            interval: 분봉 간격 (1, 5, 15, 30, 60)
+        
+        Returns:
+            list: 분봉 데이터 리스트
+        """
+        url = f"{self.base_url}/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice"
+        
+        # TR_ID: FHKST03010200 (주식당일분봉조회)
+        headers = self.auth.get_headers(tr_id="FHKST03010200")
+        
+        params = {
+            "FID_ETC_CLS_CODE": "",
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": ticker,
+            "FID_INPUT_HOUR_1": "090000",  # 시작 시간
+            "FID_PW_DATA_INCU_YN": "Y"
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':
+                return result.get('output2', [])
+            return []
+        except Exception as e:
+            print(f"  ❌ 한국 분봉 조회 오류: {e}")
+            return []
+    
+    def get_us_minute_price(self, ticker: str, exchange: str, date: str, interval: int = 1) -> list:
+        """
+        미국 주식 분봉 조회
+        
+        Args:
+            ticker: 종목코드
+            exchange: 거래소 코드 (NAS, NYS, AMS)
+            date: 조회일 (YYYYMMDD)
+            interval: 분봉 간격 (1, 5, 15, 30, 60)
+        
+        Returns:
+            list: 분봉 데이터 리스트
+        """
+        url = f"{self.base_url}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+        
+        # TR_ID: HHDFS76950200 (해외주식분봉조회)
+        headers = self.auth.get_headers(tr_id="HHDFS76950200")
+        
+        # 분봉 간격 코드 변환
+        interval_code = {1: "1", 5: "5", 15: "15", 30: "30", 60: "60"}.get(interval, "1")
+        
+        params = {
+            "AUTH": "",
+            "EXCD": exchange,
+            "SYMB": ticker,
+            "NMIN": interval_code,
+            "PINC": "1",
+            "NEXT": "",
+            "NREC": "120",  # 최대 120건
+            "FILL": "",
+            "KEYB": ""
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':
+                return result.get('output2', [])
+            return []
+        except Exception as e:
+            print(f"  ❌ 미국 분봉 조회 오류: {e}")
+            return []
+    
     def close(self):
         """리소스 정리"""
         if self.auth:
