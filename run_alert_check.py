@@ -6,13 +6,13 @@
 
 import asyncio
 from database import StockDatabase
-from realtime_monitor_hybrid import HybridMonitor
+from realtime_monitor_hybrid import HybridRealtimeMonitor
 
 async def test_alert():
     """알림 테스트 - 목표가를 현재가보다 높게 설정"""
     
     db = StockDatabase()
-    monitor = HybridMonitor()
+    monitor = HybridRealtimeMonitor()
     
     # 사용자 정보 확인
     users = db.get_all_users()
