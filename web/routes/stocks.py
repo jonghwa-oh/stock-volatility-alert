@@ -55,9 +55,36 @@ def add_stock():
             print("❌ 티커가 비어있음!")
             return render_template('stocks/add.html', username=username)
         
-        # 이름이 없으면 티커 사용
-        if not name:
-            name = ticker
+        # 이름이 없으면 자동 조회
+        if not name or name == ticker:
+            if country == 'KR':
+                # 한국 주식: FDR에서 한글명 조회
+                try:
+                    import FinanceDataReader as fdr
+                    etf_list = fdr.StockListing('ETF/KR')
+                    matched = etf_list[etf_list['Code'] == ticker]
+                    if len(matched) > 0:
+                        name = matched.iloc[0]['Name']
+                        print(f"📝 한국 ETF 한글명 조회: {ticker} → {name}")
+                    else:
+                        # KOSPI/KOSDAQ에서 조회
+                        kospi = fdr.StockListing('KOSPI')
+                        matched = kospi[kospi['Code'] == ticker]
+                        if len(matched) > 0:
+                            name = matched.iloc[0]['Name']
+                            print(f"📝 KOSPI 한글명 조회: {ticker} → {name}")
+                        else:
+                            kosdaq = fdr.StockListing('KOSDAQ')
+                            matched = kosdaq[kosdaq['Code'] == ticker]
+                            if len(matched) > 0:
+                                name = matched.iloc[0]['Name']
+                                print(f"📝 KOSDAQ 한글명 조회: {ticker} → {name}")
+                except Exception as e:
+                    print(f"⚠️ 한글명 조회 실패: {e}")
+            
+            # 여전히 이름이 없으면 티커 사용
+            if not name:
+                name = ticker
         
         db = StockDatabase()
         
