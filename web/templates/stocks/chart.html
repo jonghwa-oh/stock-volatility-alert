@@ -297,13 +297,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 tooltip: {
                     theme: 'dark',
-                    x: {
-                        format: 'yyyy-MM-dd'
-                    },
-                    y: {
-                        formatter: function(value) {
-                            return formatPrice(value);
-                        }
+                    custom: function({ seriesIndex, dataPointIndex, w }) {
+                        const o = w.globals.seriesCandleO[seriesIndex][dataPointIndex];
+                        const h = w.globals.seriesCandleH[seriesIndex][dataPointIndex];
+                        const l = w.globals.seriesCandleL[seriesIndex][dataPointIndex];
+                        const c = w.globals.seriesCandleC[seriesIndex][dataPointIndex];
+                        const date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
+                        const dateStr = date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                        
+                        return `
+                            <div class="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-lg">
+                                <div class="text-xs text-slate-400 mb-2">${dateStr}</div>
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                    <span class="text-slate-400">시가</span>
+                                    <span class="text-right font-medium">${formatPrice(o)}</span>
+                                    <span class="text-slate-400">고가</span>
+                                    <span class="text-right font-medium text-green-400">${formatPrice(h)}</span>
+                                    <span class="text-slate-400">저가</span>
+                                    <span class="text-right font-medium text-red-400">${formatPrice(l)}</span>
+                                    <span class="text-slate-400">종가</span>
+                                    <span class="text-right font-bold ${c >= o ? 'text-green-400' : 'text-red-400'}">${formatPrice(c)}</span>
+                                </div>
+                            </div>
+                        `;
                     }
                 }
             };
