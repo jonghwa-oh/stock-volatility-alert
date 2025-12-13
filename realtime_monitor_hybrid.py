@@ -141,7 +141,8 @@ class HybridRealtimeMonitor:
                         'country': country,
                         'drop_05x': data['drop_05x'],
                         'drop_1x': data['drop_1x'],
-                        'drop_2x': data['drop_2x']
+                        'drop_2x': data['drop_2x'],
+                        'prev_close': data['current_price']  # 분석 시점 종가 = 전일 종가
                     }
                     
                     flag = '🇰🇷' if country == 'KR' else '🇺🇸'
@@ -250,6 +251,7 @@ class HybridRealtimeMonitor:
         if send_now:
             try:
                 # ntfy로 알림 전송 (해당 종목을 관심 종목으로 가진 사용자에게)
+                prev_close = targets.get('prev_close')
                 success_count = send_stock_alert_to_all(
                     ticker=ticker,
                     name=name,
@@ -257,7 +259,8 @@ class HybridRealtimeMonitor:
                     target_price=target_price,
                     signal_type=f"{level_text} 매수",
                     sigma=sigma,
-                    country=country
+                    country=country,
+                    prev_close=prev_close
                 )
                 
                 if success_count > 0:

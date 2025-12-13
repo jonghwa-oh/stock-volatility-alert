@@ -248,32 +248,49 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
         from notification import send_stock_alert_to_all
         import os
         
-        # 발생한 알림 중 하나만 실제로 발송 (가장 낮은 레벨)
+        # 발생한 모든 알림 발송 + DB 저장
         for level in ['05x', '1x', '2x']:
             alert = alerts_triggered[level]
             if alert:
-                level_name = {'05x': '🧪 테스트', '1x': '1차', '2x': '2차'}[level]
+                level_name = {'05x': '테스트', '1x': '1차', '2x': '2차'}[level]
                 sigma = {'05x': 0.5, '1x': 1.0, '2x': 2.0}[level]
                 
-                print(f"\n   📤 {level_name} 알림 발송 중...")
+                print(f"\n   📤 {level_name} 매수 알림 발송 중...")
                 
-                # 실제 알림 시스템 사용 (투자금액 + 링크 포함)
+                # DB에 알림 내역 저장
+                users = db.get_all_users()
+                for user in users:
+                    user_watchlist = db.get_user_watchlist(user['name'])
+                    if ticker in user_watchlist:
+                        db.record_alert(
+                            user_id=user['id'],
+                            ticker=ticker,
+                            ticker_name=name,
+                            country=country,
+                            alert_level=level,
+                            target_price=alert['target'],
+                            current_price=alert['price'],
+                            drop_rate=alert['drop'],
+                            sent=True
+                        )
+                        print(f"   💾 {user['name']} 알림 내역 DB 저장")
+                
+                # 실제 알림 시스템 사용 (투자금액 + 링크 + 전일종가 포함)
                 success_count = send_stock_alert_to_all(
                     ticker=ticker,
                     name=name,
                     current_price=alert['price'],
                     target_price=alert['target'],
-                    signal_type=f"{level_name} 매수 (시뮬레이션)",
+                    signal_type=f"{level_name} 매수",
                     sigma=sigma,
-                    country=country
+                    country=country,
+                    prev_close=prev_close
                 )
                 
                 if success_count > 0:
                     print(f"   ✅ {success_count}명에게 알림 발송 완료!")
                 else:
                     print(f"   ⚠️ 알림 대상자 없음 ({ticker} 관심 종목 등록 필요)")
-                
-                break  # 가장 낮은 레벨만 발송
     
     print(f"\n{'='*60}")
     print(f"✅ 시뮬레이션 완료! 총 {alert_count}건 알림 발생")

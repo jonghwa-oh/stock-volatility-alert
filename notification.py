@@ -99,11 +99,15 @@ def notify_all_users(message: str, title: str = None) -> int:
 
 
 def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
-                            target_price: float, signal_type: str = "매수", 
-                            sigma: float = 1.0, country: str = 'US') -> int:
+                            target_price: float, signal_type: str = "1차 매수", 
+                            sigma: float = 1.0, country: str = 'US',
+                            prev_close: float = None) -> int:
     """
     모든 활성 사용자에게 주식 알림 전송
     (해당 종목을 관심 종목으로 등록한 사용자만)
+    
+    Args:
+        prev_close: 전일 종가 (하락률 계산용)
     
     Returns:
         성공한 사용자 수
@@ -145,10 +149,10 @@ def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
             if ntfy.send_stock_alert(
                 ticker, name, current_price, target_price, 
                 signal_type, sigma, country=country, base_url=base_url,
-                investment_amount=investment_amount
+                investment_amount=investment_amount, prev_close=prev_close
             ):
                 success_count += 1
-                print(f"✅ 사용자 {user_id}에게 {ticker} 알림 전송 완료 (투자금액: {investment_amount})")
+                print(f"✅ 사용자 {user_id}에게 {ticker} 알림 전송 완료")
     
     return success_count
 

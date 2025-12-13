@@ -10,4 +10,5 @@ pycryptodome>=3.19.0
 flask>=3.0.0
 gunicorn>=21.0.0
 yfinance>=0.2.0
+pytz>=2024.1
 

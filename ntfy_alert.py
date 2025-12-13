@@ -80,11 +80,12 @@ class NtfyAlert:
                          name: str,
                          current_price: float,
                          target_price: float,
-                         signal_type: str = "매수",
+                         signal_type: str = "1차 매수",
                          sigma: float = 1.0,
                          country: str = 'US',
                          base_url: str = None,
-                         investment_amount: float = None) -> bool:
+                         investment_amount: float = None,
+                         prev_close: float = None) -> bool:
         """
         주식 알림 전송
         
@@ -93,52 +94,83 @@ class NtfyAlert:
             name: 종목명
             current_price: 현재가
             target_price: 목표가
-            signal_type: 신호 유형 (매수/매도)
+            signal_type: 신호 유형 (1차 매수, 2차 매수 등)
             sigma: 시그마 배수
             country: 국가 코드 (KR/US)
             base_url: 웹 대시보드 기본 URL (예: http://192.168.1.100:8080)
             investment_amount: 투자금액 (한국: 원, 미국: 달러)
+            prev_close: 전일 종가
         """
         import os
         import math
+        from datetime import datetime
+        import pytz
         
         # 이모지 태그 설정
-        if "매수" in signal_type:
-            tags = ["chart_with_downwards_trend", "money_bag"]
-            priority = 4  # 높음
+        tags = ["chart_with_downwards_trend", "money_bag"]
+        priority = 4  # 높음
+        
+        # 시그마에 따른 타이틀
+        if sigma == 0.5:
+            title = f"🧪 {name} 테스트 매수"
+        elif sigma == 1.0:
+            title = f"📊 {name} 1차 매수"
         else:
-            tags = ["chart_with_upwards_trend", "moneybag"]
-            priority = 3  # 보통
+            title = f"🔥 {name} 2차 매수"
         
-        title = f"📊 {name} {signal_type} 신호!"
-        
-        # 가격 포맷 (한국: 천단위 쉼표, 미국: 소수점 2자리 버림)
+        # 현재 시간 (한국/미국)
         if country == 'KR':
-            price_fmt = f"{int(current_price):,}원"
-            target_fmt = f"{int(target_price):,}원"
+            tz = pytz.timezone('Asia/Seoul')
+            time_label = "🇰🇷 한국시간"
         else:
-            price_fmt = f"${math.floor(current_price * 100) / 100:,.2f}"
-            target_fmt = f"${math.floor(target_price * 100) / 100:,.2f}"
+            tz = pytz.timezone('America/New_York')
+            time_label = "🇺🇸 미국시간"
         
-        message = f"""종목: {name} ({ticker})
-현재가: {price_fmt}
-목표가: {target_fmt} ({sigma}σ)
-신호: {signal_type}"""
+        now = datetime.now(tz)
+        time_str = now.strftime('%H:%M:%S')
+        
+        # 가격 포맷 함수
+        def fmt_price(price, is_kr):
+            if is_kr:
+                return f"{int(price):,}원"
+            else:
+                return f"${math.floor(price * 100) / 100:,.2f}"
+        
+        is_kr = (country == 'KR')
+        current_fmt = fmt_price(current_price, is_kr)
+        target_fmt = fmt_price(target_price, is_kr)
+        
+        # 하락률 계산
+        if prev_close and prev_close > 0:
+            drop_rate = ((prev_close - current_price) / prev_close) * 100
+            prev_fmt = fmt_price(prev_close, is_kr)
+        else:
+            drop_rate = ((target_price - current_price) / target_price) * 100 if target_price > 0 else 0
+            prev_fmt = "-"
+        
+        # 메시지 구성
+        message = f"""{time_label} {time_str}
+
+📈 {name} ({ticker})
+━━━━━━━━━━━━━━━━
+전일종가: {prev_fmt}
+현재가: {current_fmt} (▼{abs(drop_rate):.1f}%)
+목표가: {target_fmt} ({sigma}σ)"""
         
         # 투자금액이 설정된 경우 매수 수량 계산
         if investment_amount and investment_amount > 0 and current_price > 0:
-            shares = int(investment_amount / current_price)  # 소수점 버림
-            if country == 'KR':
+            shares = int(investment_amount / current_price)
+            if is_kr:
                 invest_fmt = f"{int(investment_amount):,}원"
             else:
                 invest_fmt = f"${investment_amount:,.0f}"
             
             if shares > 0:
-                message += f"\n\n💰 투자금액: {invest_fmt}\n📦 매수 수량: {shares}주"
+                message += f"\n━━━━━━━━━━━━━━━━\n💰 {invest_fmt} → {shares}주 매수"
             else:
-                message += f"\n\n💰 투자금액: {invest_fmt}\n⚠️ 1주 미만 (금액 부족)"
+                message += f"\n━━━━━━━━━━━━━━━━\n⚠️ {invest_fmt} (1주 미만)"
         
-        # 클릭 URL 생성 (환경변수 또는 파라미터로 설정)
+        # 클릭 URL 생성
         click_url = None
         url_base = base_url or os.environ.get('WEB_BASE_URL', '')
         if url_base:
