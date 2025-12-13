@@ -98,6 +98,81 @@ def notify_all_users(message: str, title: str = None) -> int:
     return success_count
 
 
+def send_stock_alert_to_all_with_check(ticker: str, name: str, current_price: float,
+                                       target_price: float, signal_type: str = "1차 매수", 
+                                       sigma: float = 1.0, country: str = 'US',
+                                       prev_close: float = None, alert_level: str = '1x',
+                                       drop_rate: float = 0) -> tuple:
+    """
+    모든 활성 사용자에게 주식 알림 전송 (중복 체크 + DB 저장 포함)
+    
+    Returns:
+        (success_count, skip_count) 튜플
+    """
+    import os
+    
+    db = StockDatabase()
+    
+    conn = db.connect()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT DISTINCT u.id, u.ntfy_topic, uw.investment_amount
+        FROM users u
+        JOIN user_watchlist uw ON u.id = uw.user_id
+        WHERE u.enabled = 1 
+          AND u.notification_enabled = 1 
+          AND u.ntfy_topic IS NOT NULL
+          AND uw.ticker = ?
+          AND uw.enabled = 1
+    ''', (ticker,))
+    
+    users = cursor.fetchall()
+    
+    if not users:
+        db.close()
+        return (0, 0)
+    
+    base_url = os.environ.get('WEB_BASE_URL', '')
+    
+    success_count = 0
+    skip_count = 0
+    
+    for user_id, topic, investment_amount in users:
+        if not topic:
+            continue
+        
+        # 먼저 DB에 저장 시도 (중복이면 False 반환)
+        saved = db.record_alert(
+            user_id=user_id,
+            ticker=ticker,
+            ticker_name=name,
+            country=country,
+            alert_level=alert_level,
+            target_price=target_price,
+            current_price=current_price,
+            drop_rate=drop_rate,
+            sent=True
+        )
+        
+        if not saved:
+            # 중복이므로 알림 스킵
+            skip_count += 1
+            continue
+        
+        # 새 알림이면 발송
+        ntfy = NtfyAlert(topic)
+        if ntfy.send_stock_alert(
+            ticker, name, current_price, target_price, 
+            signal_type, sigma, country=country, base_url=base_url,
+            investment_amount=investment_amount, prev_close=prev_close
+        ):
+            success_count += 1
+    
+    db.close()
+    return (success_count, skip_count)
+
+
 def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
                             target_price: float, signal_type: str = "1차 매수", 
                             sigma: float = 1.0, country: str = 'US',

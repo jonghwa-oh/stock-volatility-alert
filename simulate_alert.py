@@ -241,14 +241,13 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
         else:
             print(f"\n   ❌ {level_name} 알림 미발생 (목표가 미도달)")
     
-    # 5. 실제 알림 발송 (옵션) - 새로운 알림 시스템 사용
+    # 5. 실제 알림 발송 (옵션) - 중복 체크 후 발송
     if send_alert and alert_count > 0:
-        print(f"\n[5] 📤 실제 알림 발송 (실제 알림 시스템 사용)...")
+        print(f"\n[5] 📤 실제 알림 발송 (중복 체크 적용)...")
         
-        from notification import send_stock_alert_to_all
-        import os
+        from notification import send_stock_alert_to_all_with_check
         
-        # 발생한 모든 알림 발송 + DB 저장
+        # 발생한 모든 알림 발송 (중복 체크 포함)
         for level in ['05x', '1x', '2x']:
             alert = alerts_triggered[level]
             if alert:
@@ -257,26 +256,8 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
                 
                 print(f"\n   📤 {level_name} 매수 알림 발송 중...")
                 
-                # DB에 알림 내역 저장
-                users = db.get_all_users()
-                for user in users:
-                    user_watchlist = db.get_user_watchlist(user['name'])
-                    if ticker in user_watchlist:
-                        db.record_alert(
-                            user_id=user['id'],
-                            ticker=ticker,
-                            ticker_name=name,
-                            country=country,
-                            alert_level=level,
-                            target_price=alert['target'],
-                            current_price=alert['price'],
-                            drop_rate=alert['drop'],
-                            sent=True
-                        )
-                        print(f"   💾 {user['name']} 알림 내역 DB 저장")
-                
-                # 실제 알림 시스템 사용 (투자금액 + 링크 + 전일종가 포함)
-                success_count = send_stock_alert_to_all(
+                # 중복 체크 + DB 저장 + 알림 발송 (일괄 처리)
+                success_count, skip_count = send_stock_alert_to_all_with_check(
                     ticker=ticker,
                     name=name,
                     current_price=alert['price'],
@@ -284,12 +265,16 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
                     signal_type=f"{level_name} 매수",
                     sigma=sigma,
                     country=country,
-                    prev_close=prev_close
+                    prev_close=prev_close,
+                    alert_level=level,
+                    drop_rate=alert['drop']
                 )
                 
                 if success_count > 0:
                     print(f"   ✅ {success_count}명에게 알림 발송 완료!")
-                else:
+                if skip_count > 0:
+                    print(f"   ⏭️ {skip_count}명 중복으로 스킵")
+                if success_count == 0 and skip_count == 0:
                     print(f"   ⚠️ 알림 대상자 없음 ({ticker} 관심 종목 등록 필요)")
     
     print(f"\n{'='*60}")

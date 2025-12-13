@@ -206,25 +206,24 @@ class HybridRealtimeMonitor:
     
     async def _send_buy_alert(self, ticker: str, name: str, current_price: float, level: str, targets: dict, send_now: bool = True):
         """
-        매수 알림 전송 또는 DB 기록
+        매수 알림 전송 또는 DB 기록 (사용자별 중복 체크)
         
         Args:
             send_now: True면 즉시 전송, False면 DB에만 기록
         """
-        # 중복 알림 방지 (5분 내 동일 레벨 알림 방지)
-        now = datetime.now()
-        if ticker in self.alert_history:
-            last_alert = self.alert_history[ticker].get(level)
-            if last_alert and (now - last_alert).seconds < 300:  # 5분
-                return
+        from notification import send_stock_alert_to_all_with_check
         
-        # 당일 동일 알림 체크 (DB)
-        if self.db.check_alert_sent_today(ticker, level):
-            return
+        # 중복 알림 방지 (5분 내 동일 종목+레벨 알림 방지 - 메모리 캐시)
+        now = datetime.now()
+        cache_key = f"{ticker}_{level}"
+        if cache_key in self.alert_history:
+            last_alert = self.alert_history[cache_key]
+            if (now - last_alert).seconds < 300:  # 5분
+                return
         
         # 알림 레벨 텍스트
         if level == '05x':
-            level_text = "🧪 테스트"
+            level_text = "테스트"
             sigma = 0.5
         elif level == '1x':
             level_text = "1차"
@@ -236,23 +235,12 @@ class HybridRealtimeMonitor:
         target_price = targets[level]
         drop_rate = targets[f'drop_{level}']
         country = targets['country']
+        prev_close = targets.get('prev_close')
         
-        # DB에 기록 (알림 시간 여부와 상관없이 항상)
-        conn = self.db.connect()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO alert_history 
-            (ticker, ticker_name, country, alert_level, target_price, current_price, drop_rate, alert_time, sent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (ticker, name, country, level, target_price, current_price, drop_rate, now.isoformat(), 1 if send_now else 0))
-        conn.commit()
-        
-        # 알림 전송 (알림 시간일 때만)
+        # 알림 전송 (사용자별 중복 체크 + DB 저장 포함)
         if send_now:
             try:
-                # ntfy로 알림 전송 (해당 종목을 관심 종목으로 가진 사용자에게)
-                prev_close = targets.get('prev_close')
-                success_count = send_stock_alert_to_all(
+                success_count, skip_count = send_stock_alert_to_all_with_check(
                     ticker=ticker,
                     name=name,
                     current_price=current_price,
@@ -260,19 +248,42 @@ class HybridRealtimeMonitor:
                     signal_type=f"{level_text} 매수",
                     sigma=sigma,
                     country=country,
-                    prev_close=prev_close
+                    prev_close=prev_close,
+                    alert_level=level,
+                    drop_rate=drop_rate
                 )
                 
                 if success_count > 0:
                     print(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송 ({success_count}명)")
-                else:
+                if skip_count > 0:
+                    print(f"⏭️ {name} ({ticker}) {level_text} 중복 스킵 ({skip_count}명)")
+                if success_count == 0 and skip_count == 0:
                     print(f"⚠️ {name} ({ticker}) 알림 대상 사용자 없음")
                     
             except Exception as e:
                 print(f"❌ 알림 전송 실패: {e}")
+                import traceback
+                traceback.print_exc()
         else:
-            # 알림 시간 외에는 DB에만 기록
-            print(f"💾 {name} ({ticker}) {level_text} 매수 시점 기록 (장 시간 외: {now.strftime('%H:%M:%S')})")
+            # 알림 시간 외에는 DB에만 기록 (중복 체크 포함)
+            success_count, skip_count = send_stock_alert_to_all_with_check(
+                ticker=ticker,
+                name=name,
+                current_price=current_price,
+                target_price=target_price,
+                signal_type=f"{level_text} 매수",
+                sigma=sigma,
+                country=country,
+                prev_close=prev_close,
+                alert_level=level,
+                drop_rate=drop_rate
+            )
+            # sent=False로 저장은 send_stock_alert_to_all_with_check에서 처리하지 않으므로
+            # 여기서는 로그만 출력
+            print(f"💾 {name} ({ticker}) {level_text} 매수 시점 (장외: {now.strftime('%H:%M:%S')})")
+        
+        # 메모리 캐시 업데이트
+        self.alert_history[cache_key] = now
         
         # 알림 이력 기록 (중복 방지용)
         if ticker not in self.alert_history:
