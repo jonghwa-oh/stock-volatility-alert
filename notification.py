@@ -108,6 +108,8 @@ def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
     Returns:
         성공한 사용자 수
     """
+    import os
+    
     db = StockDatabase()
     
     conn = db.connect()
@@ -132,11 +134,17 @@ def send_stock_alert_to_all(ticker: str, name: str, current_price: float,
         print(f"⚠️ {ticker} 종목을 관심 종목으로 등록한 활성 사용자가 없습니다.")
         return 0
     
+    # 웹 대시보드 URL (환경변수에서 가져오기)
+    base_url = os.environ.get('WEB_BASE_URL', '')
+    
     success_count = 0
     for user_id, topic in users:
         if topic:
             ntfy = NtfyAlert(topic)
-            if ntfy.send_stock_alert(ticker, name, current_price, target_price, signal_type, sigma):
+            if ntfy.send_stock_alert(
+                ticker, name, current_price, target_price, 
+                signal_type, sigma, country=country, base_url=base_url
+            ):
                 success_count += 1
                 print(f"✅ 사용자 {user_id}에게 {ticker} 알림 전송 완료")
     

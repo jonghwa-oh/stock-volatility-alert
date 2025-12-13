@@ -81,7 +81,9 @@ class NtfyAlert:
                          current_price: float,
                          target_price: float,
                          signal_type: str = "매수",
-                         sigma: float = 1.0) -> bool:
+                         sigma: float = 1.0,
+                         country: str = 'US',
+                         base_url: str = None) -> bool:
         """
         주식 알림 전송
         
@@ -92,9 +94,13 @@ class NtfyAlert:
             target_price: 목표가
             signal_type: 신호 유형 (매수/매도)
             sigma: 시그마 배수
+            country: 국가 코드 (KR/US)
+            base_url: 웹 대시보드 기본 URL (예: http://192.168.1.100:8080)
         """
+        import os
+        
         # 이모지 태그 설정
-        if signal_type == "매수":
+        if "매수" in signal_type:
             tags = ["chart_with_downwards_trend", "money_bag"]
             priority = 4  # 높음
         else:
@@ -103,16 +109,31 @@ class NtfyAlert:
         
         title = f"📊 {name} {signal_type} 신호!"
         
+        # 가격 포맷 (한국: 천단위 쉼표, 미국: 소수점 2자리)
+        if country == 'KR':
+            price_fmt = f"{int(current_price):,}원"
+            target_fmt = f"{int(target_price):,}원"
+        else:
+            price_fmt = f"${current_price:,.2f}"
+            target_fmt = f"${target_price:,.2f}"
+        
         message = f"""종목: {name} ({ticker})
-현재가: ${current_price:,.2f}
-목표가: ${target_price:,.2f} ({sigma}σ)
+현재가: {price_fmt}
+목표가: {target_fmt} ({sigma}σ)
 신호: {signal_type}"""
+        
+        # 클릭 URL 생성 (환경변수 또는 파라미터로 설정)
+        click_url = None
+        url_base = base_url or os.environ.get('WEB_BASE_URL', '')
+        if url_base:
+            click_url = f"{url_base.rstrip('/')}/stocks/chart/{ticker}"
         
         return self.send(
             message=message,
             title=title,
             priority=priority,
-            tags=tags
+            tags=tags,
+            click_url=click_url
         )
     
     def send_morning_report(self, report: str) -> bool:

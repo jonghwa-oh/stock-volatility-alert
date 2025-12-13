@@ -22,6 +22,8 @@ services:
       - PYTHONUNBUFFERED=1
       # 디버그 모드: true로 설정시 24시간 알림 활성화
       - DEBUG_MODE=${DEBUG_MODE:-true}
+      # 웹 대시보드 URL (알림 링크용)
+      - WEB_BASE_URL=${WEB_BASE_URL:-http://192.168.1.100:8080}
     
     # 로그 제한
     logging:
