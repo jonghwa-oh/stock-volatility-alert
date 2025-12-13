@@ -164,6 +164,57 @@
                 </div>
             </div>
             
+            <!-- 투자금액 입력 (종목 선택 후 표시) -->
+            <div x-show="selectedStock || verifiedStock" x-transition class="space-y-2">
+                <label class="block text-sm font-medium text-slate-300">
+                    💰 투자금액 
+                    <span class="text-slate-400" x-text="country === 'KR' ? '(원)' : '(달러)'"></span>
+                </label>
+                <div class="relative">
+                    <input type="number"
+                           name="investment_amount"
+                           x-model="investmentAmount"
+                           step="any"
+                           min="0"
+                           class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl
+                                  text-white placeholder-slate-400
+                                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           :placeholder="country === 'KR' ? '예: 1000000' : '예: 1000'">
+                    <div class="absolute right-4 top-3 text-slate-400" x-text="country === 'KR' ? '₩' : '$'"></div>
+                </div>
+                <p class="text-xs text-slate-500">
+                    <span x-show="country === 'KR'">목표가 도달 시 몇 주 매수할지 계산에 사용됩니다.</span>
+                    <span x-show="country === 'US'">목표가 도달 시 몇 주 매수할지 계산에 사용됩니다.</span>
+                </p>
+                <!-- 금액 빠른 입력 버튼 -->
+                <div class="flex flex-wrap gap-2">
+                    <template x-if="country === 'KR'">
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @click="investmentAmount = 500000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">50만</button>
+                            <button type="button" @click="investmentAmount = 1000000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">100만</button>
+                            <button type="button" @click="investmentAmount = 2000000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">200만</button>
+                            <button type="button" @click="investmentAmount = 5000000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">500만</button>
+                        </div>
+                    </template>
+                    <template x-if="country === 'US'">
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @click="investmentAmount = 500" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">$500</button>
+                            <button type="button" @click="investmentAmount = 1000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">$1,000</button>
+                            <button type="button" @click="investmentAmount = 2000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">$2,000</button>
+                            <button type="button" @click="investmentAmount = 5000" 
+                                    class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded-lg">$5,000</button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
             <div class="flex gap-3 pt-2">
                 <a href="{{ url_for('stocks.list_stocks') }}"
                    class="flex-1 py-3 text-center bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors">
@@ -194,6 +245,7 @@ function stockSearch() {
         verifying: false,
         verifiedStock: null,
         verifyError: '',
+        investmentAmount: null,
         
         async search() {
             if (this.query.length < 1) {
@@ -261,6 +313,7 @@ function stockSearch() {
         clearSelection() {
             this.selectedStock = null;
             this.query = '';
+            this.investmentAmount = null;
         },
         
         submitForm(e) {
@@ -291,4 +344,3 @@ function stockSearch() {
 }
 </script>
 {% endblock %}
-

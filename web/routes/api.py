@@ -476,3 +476,54 @@ def verify_ticker():
             'error': f'검증 오류: {str(e)}'
         })
 
+
+@api_bp.route('/watchlist/investment', methods=['POST'])
+@login_required
+def update_watchlist_investment():
+    """
+    종목별 투자금액 업데이트 API
+    
+    JSON body:
+        ticker: 종목 코드
+        investment_amount: 투자금액 (KR: 원, US: 달러)
+    """
+    username = session.get('user')
+    data = request.get_json()
+    
+    ticker = data.get('ticker', '').strip().upper()
+    investment_amount = data.get('investment_amount')
+    
+    if not ticker:
+        return jsonify({
+            'success': False,
+            'error': '종목 코드가 필요합니다.'
+        })
+    
+    # 투자금액 파싱
+    if investment_amount is not None:
+        try:
+            investment_amount = float(investment_amount) if investment_amount else None
+        except (ValueError, TypeError):
+            investment_amount = None
+    
+    try:
+        db = StockDatabase()
+        success = db.update_watchlist_investment(username, ticker, investment_amount)
+        db.close()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'{ticker} 투자금액이 업데이트되었습니다.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '업데이트에 실패했습니다.'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'오류: {str(e)}'
+        })
+

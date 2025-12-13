@@ -36,9 +36,18 @@ def add_stock():
         ticker = request.form.get('ticker', '').strip().upper()
         name = request.form.get('name', '').strip()  # 종목명 추가
         country = request.form.get('country', 'US')
+        investment_amount_str = request.form.get('investment_amount', '').strip()
+        
+        # 투자금액 파싱
+        investment_amount = None
+        if investment_amount_str:
+            try:
+                investment_amount = float(investment_amount_str)
+            except ValueError:
+                pass
         
         # 디버깅 로그
-        print(f"📝 종목 추가 요청: ticker='{ticker}', name='{name}', country='{country}', user='{username}'")
+        print(f"📝 종목 추가 요청: ticker='{ticker}', name='{name}', country='{country}', investment={investment_amount}, user='{username}'")
         print(f"📝 전체 폼 데이터: {dict(request.form)}")
         
         if not ticker:
@@ -52,8 +61,8 @@ def add_stock():
         
         db = StockDatabase()
         
-        # 종목 추가 (새로운 함수 사용)
-        success = db.add_user_watchlist(username, ticker, name=name, country=country)
+        # 종목 추가 (투자금액 포함)
+        success = db.add_user_watchlist(username, ticker, name=name, country=country, investment_amount=investment_amount)
         db.close()
         
         if success:

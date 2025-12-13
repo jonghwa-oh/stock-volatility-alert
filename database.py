@@ -156,6 +156,14 @@ class StockDatabase:
             # 이미 컬럼이 존재하면 무시
             pass
         
+        # investment_amount 컬럼 추가 (종목별 투자금액)
+        try:
+            cursor.execute("ALTER TABLE user_watchlist ADD COLUMN investment_amount REAL")
+            conn.commit()
+        except sqlite3.OperationalError:
+            # 이미 컬럼이 존재하면 무시
+            pass
+        
         # 설정 테이블 (봇 토큰, 기본값 등)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS settings (
@@ -548,7 +556,7 @@ class StockDatabase:
             print(f"❌ 투자 금액 변경 실패: {e}")
             return False
     
-    def add_user_watchlist(self, user_name: str, ticker: str, name: str = None, country: str = 'US'):
+    def add_user_watchlist(self, user_name: str, ticker: str, name: str = None, country: str = 'US', investment_amount: float = None):
         """사용자 관심 종목 추가
         
         Args:
@@ -556,6 +564,7 @@ class StockDatabase:
             ticker: 종목 코드
             name: 종목명 (없으면 ticker 사용)
             country: 국가 코드 ('KR' 또는 'US')
+            investment_amount: 투자금액 (KR: 원, US: 달러)
         """
         conn = self.connect()
         cursor = conn.cursor()
@@ -572,20 +581,20 @@ class StockDatabase:
         
         try:
             cursor.execute('''
-                INSERT INTO user_watchlist (user_id, ticker, name, country)
-                VALUES (?, ?, ?, ?)
-            ''', (user['id'], ticker, name, country))
+                INSERT INTO user_watchlist (user_id, ticker, name, country, investment_amount)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (user['id'], ticker, name, country, investment_amount))
             conn.commit()
-            print(f"✅ 관심 종목 추가: {name}({ticker}) [{country}]")
+            print(f"✅ 관심 종목 추가: {name}({ticker}) [{country}] 투자금액: {investment_amount}")
             return True
         except sqlite3.IntegrityError:
-            # 이미 있으면 활성화 + 이름/국가 업데이트
+            # 이미 있으면 활성화 + 이름/국가/투자금액 업데이트
             cursor.execute('''
-                UPDATE user_watchlist SET enabled = 1, name = ?, country = ?
+                UPDATE user_watchlist SET enabled = 1, name = ?, country = ?, investment_amount = ?
                 WHERE user_id = ? AND ticker = ?
-            ''', (name, country, user['id'], ticker))
+            ''', (name, country, investment_amount, user['id'], ticker))
             conn.commit()
-            print(f"✅ 관심 종목 재활성화: {name}({ticker}) [{country}]")
+            print(f"✅ 관심 종목 재활성화: {name}({ticker}) [{country}] 투자금액: {investment_amount}")
             return True
         except Exception as e:
             print(f"❌ 관심 종목 추가 실패: {e}")
@@ -611,6 +620,32 @@ class StockDatabase:
             print(f"❌ 관심 종목 제거 실패: {e}")
             return False
     
+    def update_watchlist_investment(self, user_name: str, ticker: str, investment_amount: float) -> bool:
+        """종목별 투자금액 업데이트
+        
+        Args:
+            user_name: 사용자 이름
+            ticker: 종목 코드
+            investment_amount: 투자금액 (KR: 원, US: 달러)
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        user = self.get_user(user_name)
+        if not user:
+            return False
+        
+        try:
+            cursor.execute('''
+                UPDATE user_watchlist SET investment_amount = ?
+                WHERE user_id = ? AND ticker = ?
+            ''', (investment_amount, user['id'], ticker))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"❌ 투자금액 업데이트 실패: {e}")
+            return False
+    
     def get_user_watchlist(self, user_name: str) -> List[str]:
         """사용자 관심 종목 목록"""
         conn = self.connect()
@@ -628,7 +663,7 @@ class StockDatabase:
         return [row[0] for row in cursor.fetchall()]
     
     def get_user_watchlist_with_names(self, user_name: str) -> List[Dict]:
-        """사용자 관심 종목 목록 (종목명 + 국가 정보 포함)
+        """사용자 관심 종목 목록 (종목명 + 국가 + 투자금액 정보 포함)
         
         우선순위: user_watchlist.name > daily_prices.ticker_name > ticker
         """
@@ -640,11 +675,11 @@ class StockDatabase:
             return []
         
         cursor.execute('''
-            SELECT uw.ticker, uw.name, MAX(dp.ticker_name) as dp_name, uw.country
+            SELECT uw.ticker, uw.name, MAX(dp.ticker_name) as dp_name, uw.country, uw.investment_amount
             FROM user_watchlist uw
             LEFT JOIN daily_prices dp ON uw.ticker = dp.ticker
             WHERE uw.user_id = ? AND uw.enabled = 1
-            GROUP BY uw.ticker, uw.name, uw.country
+            GROUP BY uw.ticker, uw.name, uw.country, uw.investment_amount
         ''', (user['id'],))
         
         watchlist = []
@@ -653,6 +688,7 @@ class StockDatabase:
             uw_name = row[1]  # user_watchlist.name
             dp_name = row[2]  # daily_prices.ticker_name
             country = row[3] or 'US'
+            investment_amount = row[4]
             
             # 우선순위: uw_name > dp_name > ticker
             name = uw_name or dp_name or ticker
@@ -660,7 +696,8 @@ class StockDatabase:
             watchlist.append({
                 'ticker': ticker,
                 'name': name,
-                'country': country
+                'country': country,
+                'investment_amount': investment_amount
             })
         return watchlist
     
