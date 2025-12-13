@@ -111,7 +111,14 @@ def collect_us_minute_data(kis: KISApi, db: StockDatabase,
     current_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
     
-    exchange = kis.get_exchange_code(ticker)
+    # 거래소 자동 감지 (get_overseas_stock_price_auto 사용)
+    price_info = kis.get_overseas_stock_price_auto(ticker)
+    if price_info:
+        exchange = price_info.get('exchange', 'NAS')
+        print(f"  📍 거래소 자동 감지: {exchange}")
+    else:
+        exchange = kis.get_exchange_code(ticker)
+        print(f"  📍 거래소 기본값: {exchange}")
     
     while current_date <= end_dt:
         date_str = current_date.strftime('%Y%m%d')

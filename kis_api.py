@@ -335,6 +335,21 @@ class KISApi:
         if ticker_upper in self._exchange_cache:
             return self._exchange_cache[ticker_upper]
         
+        # 알려진 ARCA(AMS) 상장 ETF (레버리지/인버스 ETF 대부분)
+        arca_etfs = [
+            'SOXL', 'SOXS', 'QLD', 'QID', 'TQQQ', 'SQQQ',  # 반도체/나스닥 레버리지
+            'TECL', 'TECS', 'SPXL', 'SPXS', 'UPRO', 'SPXU',  # 기술/S&P 레버리지
+            'TNA', 'TZA', 'LABU', 'LABD', 'FAS', 'FAZ',  # 소형주/바이오/금융 레버리지
+            'NUGT', 'DUST', 'JNUG', 'JDST', 'GDXU', 'GDXD',  # 금광 레버리지
+            'KORU', 'YANG', 'YINN', 'KWEB',  # 한국/중국 레버리지
+            'ERX', 'ERY', 'UCO', 'SCO', 'GUSH', 'DRIP',  # 에너지 레버리지
+            'TMF', 'TMV', 'TBT', 'TLT',  # 채권 레버리지
+            'UVXY', 'SVXY', 'VXX',  # 변동성
+        ]
+        
+        if ticker_upper in arca_etfs:
+            return "AMS"
+        
         # 기본 추측 (레버리지 ETF는 대부분 ARCA)
         leverage_keywords = ['3X', 'BULL', 'BEAR', 'ULTRA']
         if any(kw in ticker_upper for kw in leverage_keywords):
@@ -343,7 +358,7 @@ class KISApi:
         # 알려진 나스닥 대형주
         nasdaq_majors = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 
                          'TSLA', 'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 
-                         'CSCO', 'TQQQ', 'QQQ', 'INTC', 'PYPL']
+                         'CSCO', 'QQQ', 'INTC', 'PYPL']
         
         if ticker_upper in nasdaq_majors:
             return "NAS"
