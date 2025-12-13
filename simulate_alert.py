@@ -6,9 +6,9 @@
 """
 
 import argparse
+import numpy as np
 from datetime import datetime, date
 from database import StockDatabase
-from volatility_analysis import analyze_daily_volatility
 from ntfy_alert import NtfyAlert
 
 def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
@@ -28,12 +28,13 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
     print(f"🔔 알림 발송: {'예' if send_alert else '아니오 (테스트만)'}")
     print(f"{'='*60}\n")
     
-    # 1. 종목 분석 데이터 가져오기
-    print("[1] 📈 종목 분석...")
+    # 1. 전일 종가 및 변동성 계산
+    print("[1] 📈 전일 종가 기준 분석...")
     
-    # 종목 정보 가져오기
     conn = db.connect()
     cursor = conn.cursor()
+    
+    # 종목 정보 가져오기
     cursor.execute('''
         SELECT DISTINCT ticker_name FROM minute_prices WHERE ticker = ?
     ''', (ticker,))
@@ -43,23 +44,85 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
     # 국가 판별
     country = 'KR' if ticker.isdigit() or (len(ticker) == 6 and ticker[0].isdigit()) else 'US'
     
-    # 분석 실행 (목표가 계산)
-    analysis = analyze_daily_volatility(ticker, name, country=country, create_chart=False)
+    # 전일 종가 가져오기 (시뮬레이션 날짜 직전 거래일)
+    from kis_api import KISApi
+    kis = KISApi()
     
-    if not analysis:
-        print(f"❌ {ticker} 분석 실패")
+    if country == 'US':
+        exchange = kis.get_exchange_code(ticker)
+        df = kis.get_overseas_daily_price_history(ticker, exchange)
+    else:
+        df = kis.get_daily_price_history(ticker)
+    
+    kis.close()
+    
+    if df is None or df.empty:
+        print(f"❌ {ticker} 일봉 데이터 없음")
         db.close()
         return
     
+    # 시뮬레이션 날짜의 전일 종가 찾기
+    target_dt = datetime.strptime(target_date, '%Y-%m-%d').date()
+    
+    # 날짜 인덱스 처리
+    df_dates = df.index.date if hasattr(df.index, 'date') else df.index
+    prev_close = None
+    prev_date = None
+    
+    for i, d in enumerate(df_dates):
+        if d >= target_dt and i > 0:
+            prev_close = float(df['Close'].iloc[i-1])
+            prev_date = df_dates[i-1]
+            break
+    
+    if prev_close is None:
+        # 마지막 날짜 이전 데이터 사용
+        if len(df) >= 2:
+            prev_close = float(df['Close'].iloc[-2])
+            prev_date = df_dates[-2]
+        else:
+            print(f"❌ 전일 종가를 찾을 수 없습니다")
+            db.close()
+            return
+    
+    # 변동성 계산 (최근 20일 기준)
+    returns = df['Close'].pct_change().dropna() * 100
+    std_return = float(returns.tail(20).std())
+    
+    # 목표가 계산
+    target_05x = prev_close * (1 - std_return * 0.5 / 100)
+    target_1x = prev_close * (1 - std_return / 100)
+    target_2x = prev_close * (1 - std_return * 2 / 100)
+    
+    drop_05x = std_return * 0.5
+    drop_1x = std_return
+    drop_2x = std_return * 2
+    
+    analysis = {
+        'current_price': prev_close,
+        'std_return': std_return,
+        'target_05x': target_05x,
+        'target_1x': target_1x,
+        'target_2x': target_2x,
+        'drop_05x': drop_05x,
+        'drop_1x': drop_1x,
+        'drop_2x': drop_2x
+    }
+    
     print(f"   종목: {name} ({ticker})")
     print(f"   국가: {country}")
-    print(f"   현재가: ${analysis['current_price']:.2f}" if country == 'US' else f"   현재가: {analysis['current_price']:,.0f}원")
-    print(f"   일일 변동성: {analysis['std_return']:.2f}%")
-    print(f"\n   🎯 목표가:")
+    print(f"   기준일: {prev_date} (전일)")
+    print(f"   전일종가: ${prev_close:.2f}" if country == 'US' else f"   전일종가: {prev_close:,.0f}원")
+    print(f"   일일 변동성: {std_return:.2f}%")
+    print(f"\n   🎯 {target_date} 목표가 (전일종가 기준):")
     if country == 'US':
-        print(f"      0.5σ: ${analysis['target_05x']:.2f} ({analysis['drop_05x']:.2f}% 하락)")
-        print(f"      1σ:   ${analysis['target_1x']:.2f} ({analysis['drop_1x']:.2f}% 하락)")
-        print(f"      2σ:   ${analysis['target_2x']:.2f} ({analysis['drop_2x']:.2f}% 하락)")
+        print(f"      0.5σ: ${target_05x:.2f} ({drop_05x:.2f}% 하락)")
+        print(f"      1σ:   ${target_1x:.2f} ({drop_1x:.2f}% 하락)")
+        print(f"      2σ:   ${target_2x:.2f} ({drop_2x:.2f}% 하락)")
+    else:
+        print(f"      0.5σ: {target_05x:,.0f}원 ({drop_05x:.2f}% 하락)")
+        print(f"      1σ:   {target_1x:,.0f}원 ({drop_1x:.2f}% 하락)")
+        print(f"      2σ:   {target_2x:,.0f}원 ({drop_2x:.2f}% 하락)")
     else:
         print(f"      0.5σ: {analysis['target_05x']:,.0f}원 ({analysis['drop_05x']:.2f}% 하락)")
         print(f"      1σ:   {analysis['target_1x']:,.0f}원 ({analysis['drop_1x']:.2f}% 하락)")
