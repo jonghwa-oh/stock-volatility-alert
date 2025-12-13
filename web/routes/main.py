@@ -21,20 +21,36 @@ def get_stock_analysis(ticker: str, name: str, country: str) -> dict:
     if cached and cached.get('current_price'):
         print(f"  📦 [{ticker}] 캐시 사용")
         db.close()
+        
+        # 타입 변환 (bytes → float/str)
+        def safe_float(val):
+            if val is None:
+                return None
+            if isinstance(val, bytes):
+                val = val.decode('utf-8')
+            return float(val) if val else None
+        
+        def safe_str(val):
+            if val is None:
+                return None
+            if isinstance(val, bytes):
+                return val.decode('utf-8')
+            return str(val) if val else None
+        
         return {
             'ticker': ticker,
-            'name': cached.get('ticker_name') or name,
-            'country': cached.get('country') or country,
-            'current_price': cached['current_price'],
-            'data_date': cached.get('data_date'),
-            'target_05x': cached.get('target_05x'),
-            'target_1x': cached.get('target_1x'),
-            'target_2x': cached.get('target_2x'),
-            'drop_05x': cached.get('drop_05x'),
-            'drop_1x': cached.get('drop_1x'),
-            'drop_2x': cached.get('drop_2x'),
-            'std_return': cached.get('std_return'),
-            'volatility': cached.get('std_return'),
+            'name': safe_str(cached.get('ticker_name')) or name,
+            'country': safe_str(cached.get('country')) or country,
+            'current_price': safe_float(cached['current_price']),
+            'data_date': safe_str(cached.get('data_date')),
+            'target_05x': safe_float(cached.get('target_05x')),
+            'target_1x': safe_float(cached.get('target_1x')),
+            'target_2x': safe_float(cached.get('target_2x')),
+            'drop_05x': safe_float(cached.get('drop_05x')),
+            'drop_1x': safe_float(cached.get('drop_1x')),
+            'drop_2x': safe_float(cached.get('drop_2x')),
+            'std_return': safe_float(cached.get('std_return')),
+            'volatility': safe_float(cached.get('std_return')),
             'success': True,
             'from_cache': True
         }
