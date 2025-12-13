@@ -412,6 +412,15 @@ class StockDatabase:
         conn = self.connect()
         cursor = conn.cursor()
         
+        # 모든 숫자값을 float로 강제 변환 (BLOB 저장 방지)
+        def to_float(val):
+            if val is None:
+                return None
+            try:
+                return float(val)
+            except:
+                return None
+        
         try:
             cursor.execute('''
                 INSERT OR REPLACE INTO statistics_cache 
@@ -419,9 +428,11 @@ class StockDatabase:
                  current_price, target_05sigma, target_1sigma, target_2sigma,
                  drop_05x, drop_1x, drop_2x)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (ticker, ticker_name, country, date, data_date, mean_return, std_dev, 
-                  current_price, target_05sigma, target_1sigma, target_2sigma,
-                  drop_05x, drop_1x, drop_2x))
+            ''', (ticker, ticker_name, country, date, data_date, 
+                  to_float(mean_return), to_float(std_dev), 
+                  to_float(current_price), to_float(target_05sigma), 
+                  to_float(target_1sigma), to_float(target_2sigma),
+                  to_float(drop_05x), to_float(drop_1x), to_float(drop_2x)))
             conn.commit()
             return True
         except Exception as e:
