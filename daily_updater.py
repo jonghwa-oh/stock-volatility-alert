@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 매일 자동 스케줄러
-- 08:00: 일봉 데이터 업데이트 + 놓친 알림 요약
+- 08:00: 일봉 데이터 업데이트 + 놓친 알림 요약 (월-금)
 - 08:50: 오늘의 매수 전략 분석 (월-금)
+※ 토/일요일은 모든 알림 및 모니터링 제외
 """
 import schedule
 import time
@@ -10,11 +11,21 @@ from datetime import datetime
 from data_collector import DataCollector
 from missed_alerts import send_missed_alerts_summary
 from daily_analysis import send_daily_alerts
-from log_utils import log, log_section, log_success, log_error
+from log_utils import log, log_section, log_success, log_error, log_warning
+
+
+def is_weekday() -> bool:
+    """평일(월-금) 여부 확인"""
+    return datetime.now().weekday() < 5  # 0=월, 4=금, 5=토, 6=일
 
 
 def morning_update_job():
-    """일봉 데이터 업데이트 + 놓친 알림 전송 (매일 08:00)"""
+    """일봉 데이터 업데이트 + 놓친 알림 전송 (월-금 08:00)"""
+    # 주말 체크
+    if not is_weekday():
+        log_warning("📅 주말입니다. 아침 업데이트를 건너뜁니다.")
+        return
+    
     log_section("⏰ 아침 업데이트 시작")
     
     # 1. 일봉 데이터 업데이트
@@ -48,6 +59,11 @@ def morning_update_job():
 
 def daily_analysis_job():
     """오늘의 매수 전략 분석 (월-금 08:50)"""
+    # 주말 체크
+    if not is_weekday():
+        log_warning("📅 주말입니다. 매수 전략 분석을 건너뜁니다.")
+        return
+    
     log_section("📊 오늘의 매수 전략 분석 시작")
     
     try:

@@ -4,8 +4,7 @@
 """
 from datetime import datetime, timedelta
 from database import StockDatabase
-from telegram_bot import send_telegram_sync
-from config import load_config
+from notification import send_notification
 
 
 def send_missed_alerts_summary():
@@ -17,8 +16,6 @@ def send_missed_alerts_summary():
     print("="*70)
     
     db = StockDatabase()
-    config = load_config()
-    telegram_config = config['TELEGRAM_CONFIG']
     
     # 오늘 00:00 ~ 06:00 사이 놓친 알림 조회
     today = datetime.now()
@@ -51,7 +48,7 @@ def send_missed_alerts_summary():
     users = db.get_all_users()
     
     for user in users:
-        if not user['enabled']:
+        if not user['enabled'] or not user.get('notification_enabled'):
             continue
         
         # 해당 사용자의 관심 종목만 필터링
@@ -95,14 +92,13 @@ def send_missed_alerts_summary():
         message += "💡 실시간 알림은 09:00~24:00만 전송됩니다.\n"
         message += "   밤 사이 매수 기회는 다음 날 아침에 요약해드립니다."
         
-        # 전송
+        # ntfy로 전송
         try:
-            send_telegram_sync(
-                telegram_config['BOT_TOKEN'],
-                telegram_config['CHAT_ID'],
-                message=message
-            )
-            print(f"  ✅ {user['name']}님에게 전송: {len(user_missed)}건")
+            result = send_notification(user['id'], message, title="🌙 밤 사이 놓친 알림")
+            if result:
+                print(f"  ✅ {user['name']}님에게 전송: {len(user_missed)}건")
+            else:
+                print(f"  ⚠️ {user['name']}님 전송 실패 (ntfy 토픽 미설정?)")
         except Exception as e:
             print(f"  ❌ {user['name']}님 전송 실패: {e}")
     
@@ -122,6 +118,3 @@ def send_missed_alerts_summary():
 
 if __name__ == "__main__":
     send_missed_alerts_summary()
-
-
-

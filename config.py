@@ -15,12 +15,18 @@ def load_config():
         bot_token = db.get_setting('bot_token')
         default_chat_id = db.get_setting('default_chat_id')
         
+        # 투자 설정
+        default_amount = db.get_setting('default_investment_amount', '1000000')
+        
         db.close()
         
         return {
             'TELEGRAM_CONFIG': {
                 'BOT_TOKEN': bot_token,
                 'CHAT_ID': default_chat_id,
+            },
+            'INVESTMENT_CONFIG': {
+                'default_amount': int(default_amount),
             }
         }
     except Exception as e:
@@ -31,6 +37,9 @@ def load_config():
             'TELEGRAM_CONFIG': {
                 'BOT_TOKEN': None,
                 'CHAT_ID': None,
+            },
+            'INVESTMENT_CONFIG': {
+                'default_amount': 1000000,
             }
         }
 
@@ -38,6 +47,7 @@ def load_config():
 # 설정 로드
 _config = load_config()
 TELEGRAM_CONFIG = _config['TELEGRAM_CONFIG']
+INVESTMENT_CONFIG = _config['INVESTMENT_CONFIG']
 
 
 # 분석 종목 (여기는 민감한 정보 아니므로 그대로)

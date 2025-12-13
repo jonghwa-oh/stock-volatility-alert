@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}종목 관리 - 주식 알림{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="stockList()">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold">📋 종목 관리</h1>
+        <a href="{{ url_for('stocks.add_stock') }}"
+           class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+            ➕ 추가
+        </a>
+    </div>
+    
+    {% if watchlist %}
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+        <div class="divide-y divide-slate-700">
+            {% for stock in watchlist %}
+            <div class="p-4 hover:bg-slate-700/50 transition-colors"
+                 x-data="{ editing: false, amount: {{ stock.investment_amount or 'null' }}, saving: false }">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="text-2xl">{{ '🇰🇷' if stock.country == 'KR' else '🇺🇸' }}</span>
+                        <div>
+                            <p class="font-medium">{{ stock.name }}</p>
+                            <p class="text-sm text-slate-400">{{ stock.ticker }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <a href="{{ url_for('stocks.view_chart', ticker=stock.ticker) }}"
+                           class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm">
+                            📈 차트
+                        </a>
+                        <form method="POST" action="{{ url_for('stocks.delete_stock', ticker=stock.ticker) }}"
+                              onsubmit="return confirm('{{ stock.ticker }} 종목을 삭제하시겠습니까?');">
+                            <button type="submit" 
+                                    class="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm">
+                                🗑️
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- 투자금액 영역 -->
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-slate-400">💰 투자금액</span>
+                        
+                        <!-- 보기 모드 -->
+                        <div x-show="!editing" class="flex items-center gap-2">
+                            <span class="font-medium" x-text="amount ? (amount.toLocaleString() + '{{ '원' if stock.country == 'KR' else '$' }}') : '미설정'"></span>
+                            <button @click="editing = true" 
+                                    class="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-400">
+                                ✏️
+                            </button>
+                        </div>
+                        
+                        <!-- 수정 모드 -->
+                        <div x-show="editing" class="flex items-center gap-2">
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                                    {{ '₩' if stock.country == 'KR' else '$' }}
+                                </span>
+                                <input type="number" 
+                                       x-model="amount"
+                                       step="any"
+                                       min="0"
+                                       class="w-32 pl-7 pr-2 py-1 text-sm bg-slate-700 border border-slate-600 rounded focus:outline-none focus:border-blue-500">
+                            </div>
+                            <button @click="
+                                saving = true;
+                                fetch('/api/watchlist/investment', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({
+                                        ticker: '{{ stock.ticker }}',
+                                        investment_amount: amount
+                                    })
+                                }).then(r => r.json()).then(d => {
+                                    saving = false;
+                                    editing = false;
+                                    if (!d.success) alert('저장 실패');
+                                }).catch(e => {
+                                    saving = false;
+                                    alert('오류 발생');
+                                });
+                            " :disabled="saving"
+                               class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded disabled:bg-slate-600">
+                                <span x-text="saving ? '...' : '✓'"></span>
+                            </button>
+                            <button @click="editing = false; amount = {{ stock.investment_amount or 'null' }}" 
+                                    class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 빠른 설정 버튼 (수정 모드) -->
+                    <div x-show="editing" class="mt-2 flex flex-wrap gap-1">
+                        {% if stock.country == 'KR' %}
+                        <button type="button" @click="amount = 500000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">50만</button>
+                        <button type="button" @click="amount = 1000000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">100만</button>
+                        <button type="button" @click="amount = 2000000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">200만</button>
+                        <button type="button" @click="amount = 5000000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">500만</button>
+                        {% else %}
+                        <button type="button" @click="amount = 500" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">$500</button>
+                        <button type="button" @click="amount = 1000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">$1K</button>
+                        <button type="button" @click="amount = 2000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">$2K</button>
+                        <button type="button" @click="amount = 5000" class="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded">$5K</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-16 bg-slate-800 rounded-2xl border border-slate-700">
+        <div class="text-6xl mb-4">📭</div>
+        <h2 class="text-xl font-bold mb-2">등록된 종목이 없습니다</h2>
+        <p class="text-slate-400 mb-6">관심 종목을 추가하여 모니터링을 시작하세요</p>
+        <a href="{{ url_for('stocks.add_stock') }}"
+           class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+            ➕ 종목 추가하기
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function stockList() {
+    return {}
+}
+</script>
+{% endblock %}

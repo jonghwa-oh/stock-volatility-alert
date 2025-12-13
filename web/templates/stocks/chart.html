@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticker }} 차트 - 주식 알림{% endblock %}
+
+{% block head %}
+<!-- ApexCharts -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.1/dist/apexcharts.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 헤더 -->
+    <div class="flex items-center gap-4">
+        <a href="{{ url_for('main.index') }}"
+           class="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+            ← 
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <span>{{ '🇰🇷' if stock_info and stock_info.country == 'KR' else '🇺🇸' }}</span>
+                {{ stock_info.name if stock_info else ticker }}
+            </h1>
+            <p class="text-slate-400">{{ ticker }}</p>
+        </div>
+    </div>
+    
+    {% if analysis %}
+    <!-- 분석 요약 카드 -->
+    <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="text-center p-4 bg-slate-700/50 rounded-xl">
+                <p class="text-sm text-slate-400 mb-1">현재가</p>
+                <p class="text-xl font-bold">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.current_price) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.current_price) }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-center p-4 bg-yellow-500/10 rounded-xl">
+                <p class="text-sm text-yellow-400 mb-1">0.5σ 목표</p>
+                <p class="text-xl font-bold text-yellow-400">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.target_05x) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.target_05x) }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-center p-4 bg-blue-500/10 rounded-xl">
+                <p class="text-sm text-blue-400 mb-1">1σ 목표</p>
+                <p class="text-xl font-bold text-blue-400">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.target_1x) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.target_1x) }}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="text-center p-4 bg-purple-500/10 rounded-xl">
+                <p class="text-sm text-purple-400 mb-1">2σ 목표</p>
+                <p class="text-xl font-bold text-purple-400">
+                    {% if stock_info and stock_info.country == 'KR' %}
+                    {{ "{:,.0f}".format(analysis.target_2x) }}원
+                    {% else %}
+                    ${{ "{:,.2f}".format(analysis.target_2x) }}
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-slate-700 flex items-center justify-between text-sm">
+            <span class="text-slate-400">일일 변동성</span>
+            <span class="font-medium">{{ "{:.2f}".format(analysis.std_return) }}%</span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 인터랙티브 캔들 차트 -->
+    <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold">📈 가격 차트</h2>
+            <div class="flex gap-2" x-data="{ loading: true }">
+                <span x-show="loading" class="text-slate-400 text-sm flex items-center gap-2">
+                    <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    로딩중...
+                </span>
+            </div>
+        </div>
+        
+        <div id="candlestick-chart" class="bg-slate-900 rounded-xl" style="min-height: 400px;"></div>
+    </div>
+    
+    <!-- 변동성 차트 (기존 이미지) -->
+    {% if chart_files %}
+    <div x-data="{ selectedChart: '{{ chart_files[0] }}', showHistory: false }" class="space-y-4">
+        <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold">📊 변동성 분포</h2>
+                <button @click="showHistory = !showHistory" 
+                        class="text-sm text-slate-400 hover:text-white flex items-center gap-1">
+                    <span x-text="showHistory ? '접기' : '📅 차트 목록 ({{ chart_files|length }}개)'"></span>
+                </button>
+            </div>
+            
+            <div class="bg-slate-900 rounded-xl overflow-hidden">
+                <img :src="'/charts/' + selectedChart" 
+                     alt="{{ ticker }} 차트"
+                     class="w-full">
+                <p class="text-center text-sm text-slate-400 py-2" x-text="selectedChart.split('/')[1].split('_')[0]"></p>
+            </div>
+        </div>
+        
+        <!-- 차트 히스토리 -->
+        <div x-show="showHistory" x-transition class="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+            <h3 class="text-sm font-medium text-slate-400 mb-3">📅 일자별 차트</h3>
+            
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {% for chart in chart_files %}
+                <button @click="selectedChart = '{{ chart }}'"
+                        class="relative rounded-xl overflow-hidden transition-all"
+                        :class="selectedChart === '{{ chart }}' ? 'ring-2 ring-blue-500' : 'opacity-60 hover:opacity-100'">
+                    <img src="/charts/{{ chart }}" alt="" class="w-full aspect-video object-cover">
+                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-2">
+                        <span class="text-xs text-white">{{ chart.split('/')[-1].split('_')[0] }}</span>
+                    </div>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-slate-800 rounded-2xl border border-slate-700">
+        <div class="text-5xl mb-4">📊</div>
+        <h2 class="text-xl font-bold mb-2">변동성 차트가 없습니다</h2>
+        <p class="text-slate-400">매일 아침 분석 시 생성됩니다</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ticker = '{{ ticker }}';
+    const country = '{{ stock_info.country if stock_info else "US" }}';
+    const isKorean = country === 'KR';
+    
+    // 가격 포맷 함수 (한국: 천단위 쉼표, 미국: 소수점 2자리 버림)
+    function formatPrice(value) {
+        if (isKorean) {
+            return Math.floor(value).toLocaleString() + '원';
+        }
+        return '$' + (Math.floor(value * 100) / 100).toFixed(2);
+    }
+    
+    // 목표가 라인
+    const targets = {
+        target_05x: {{ analysis.target_05x if analysis else 0 }},
+        target_1x: {{ analysis.target_1x if analysis else 0 }},
+        target_2x: {{ analysis.target_2x if analysis else 0 }}
+    };
+    
+    // 차트 데이터 로드
+    fetch(`/api/stocks/${ticker}/chart-data`)
+        .then(res => res.json())
+        .then(result => {
+            if (!result.success) {
+                console.error('차트 데이터 로드 실패:', result.error);
+                return;
+            }
+            
+            const data = result.data;
+            
+            // 캔들스틱 차트 옵션
+            const options = {
+                series: [{
+                    name: ticker,
+                    data: data.ohlc.map(d => ({
+                        x: new Date(d.x),
+                        y: [d.o, d.h, d.l, d.c]
+                    }))
+                }],
+                chart: {
+                    type: 'candlestick',
+                    height: 400,
+                    background: 'transparent',
+                    foreColor: '#94a3b8',
+                    toolbar: {
+                        show: true,
+                        tools: {
+                            download: false,
+                            selection: true,
+                            zoom: true,
+                            zoomin: true,
+                            zoomout: true,
+                            pan: true,
+                            reset: true
+                        }
+                    },
+                    animations: {
+                        enabled: true,
+                        easing: 'easeinout',
+                        speed: 800
+                    }
+                },
+                theme: {
+                    mode: 'dark'
+                },
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        datetimeFormatter: {
+                            year: 'yyyy',
+                            month: 'MM/dd',
+                            day: 'MM/dd',
+                            hour: 'HH:mm'
+                        }
+                    }
+                },
+                yaxis: {
+                    tooltip: {
+                        enabled: true
+                    },
+                    labels: {
+                        formatter: function(value) {
+                            return formatPrice(value);
+                        }
+                    }
+                },
+                annotations: {
+                    yaxis: [
+                        {
+                            y: targets.target_05x,
+                            borderColor: '#eab308',
+                            borderWidth: 2,
+                            strokeDashArray: 5,
+                            label: {
+                                borderColor: '#eab308',
+                                style: {
+                                    color: '#000',
+                                    background: '#eab308'
+                                },
+                                text: '0.5σ: ' + formatPrice(targets.target_05x)
+                            }
+                        },
+                        {
+                            y: targets.target_1x,
+                            borderColor: '#3b82f6',
+                            borderWidth: 2,
+                            strokeDashArray: 5,
+                            label: {
+                                borderColor: '#3b82f6',
+                                style: {
+                                    color: '#fff',
+                                    background: '#3b82f6'
+                                },
+                                text: '1σ: ' + formatPrice(targets.target_1x)
+                            }
+                        },
+                        {
+                            y: targets.target_2x,
+                            borderColor: '#a855f7',
+                            borderWidth: 2,
+                            strokeDashArray: 5,
+                            label: {
+                                borderColor: '#a855f7',
+                                style: {
+                                    color: '#fff',
+                                    background: '#a855f7'
+                                },
+                                text: '2σ: ' + formatPrice(targets.target_2x)
+                            }
+                        }
+                    ]
+                },
+                plotOptions: {
+                    candlestick: {
+                        colors: {
+                            upward: '#22c55e',
+                            downward: '#ef4444'
+                        },
+                        wick: {
+                            useFillColor: true
+                        }
+                    }
+                },
+                grid: {
+                    borderColor: '#334155',
+                    strokeDashArray: 3
+                },
+                tooltip: {
+                    theme: 'dark',
+                    custom: function({ seriesIndex, dataPointIndex, w }) {
+                        const o = w.globals.seriesCandleO[seriesIndex][dataPointIndex];
+                        const h = w.globals.seriesCandleH[seriesIndex][dataPointIndex];
+                        const l = w.globals.seriesCandleL[seriesIndex][dataPointIndex];
+                        const c = w.globals.seriesCandleC[seriesIndex][dataPointIndex];
+                        const date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
+                        const dateStr = date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                        
+                        return `
+                            <div class="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg shadow-lg">
+                                <div class="text-xs text-slate-400 mb-2">${dateStr}</div>
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                    <span class="text-slate-400">시가</span>
+                                    <span class="text-right font-medium">${formatPrice(o)}</span>
+                                    <span class="text-slate-400">고가</span>
+                                    <span class="text-right font-medium text-green-400">${formatPrice(h)}</span>
+                                    <span class="text-slate-400">저가</span>
+                                    <span class="text-right font-medium text-red-400">${formatPrice(l)}</span>
+                                    <span class="text-slate-400">종가</span>
+                                    <span class="text-right font-bold ${c >= o ? 'text-green-400' : 'text-red-400'}">${formatPrice(c)}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            };
+            
+            // 차트 렌더링
+            const chart = new ApexCharts(document.querySelector("#candlestick-chart"), options);
+            chart.render();
+            
+            // 로딩 상태 해제
+            document.querySelectorAll('[x-data]').forEach(el => {
+                if (el.__x) el.__x.$data.loading = false;
+            });
+        })
+        .catch(err => {
+            console.error('차트 로드 오류:', err);
+            document.querySelector("#candlestick-chart").innerHTML = 
+                '<div class="text-center py-16 text-slate-400"><p>차트를 불러올 수 없습니다</p></div>';
+        });
+});
+</script>
+{% endblock %}

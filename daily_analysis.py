@@ -1,6 +1,6 @@
 """
 일일 매수 알림 스크립트
-월-금 8:50 AM에 실행되어 매수 추천 종목을 분석하고 텔레그램으로 전송
+월-금 8:50 AM에 실행되어 매수 추천 종목을 분석하고 ntfy로 전송
 """
 
 from datetime import datetime
@@ -9,21 +9,17 @@ import os
 
 from database import StockDatabase
 from volatility_analysis import analyze_daily_volatility, visualize_volatility
-from telegram_bot import send_telegram_sync
-from config import TELEGRAM_CONFIG
+from ntfy_alert import NtfyAlert
 from scheduler_config import SCHEDULE_CONFIG
 from kis_api import KISApi
 
 
-def send_message(chat_id, text):
-    """메시지 전송 wrapper"""
-    send_telegram_sync(TELEGRAM_CONFIG['BOT_TOKEN'], chat_id, message=text)
-
-
-def send_photo(chat_id, photo_path, caption=None):
-    """이미지 전송 wrapper"""
-    message = caption if caption else None
-    send_telegram_sync(TELEGRAM_CONFIG['BOT_TOKEN'], chat_id, message=message, photo_path=photo_path)
+def send_ntfy_message(ntfy_topic: str, message: str, title: str = None) -> bool:
+    """ntfy 메시지 전송 wrapper"""
+    if not ntfy_topic:
+        return False
+    ntfy = NtfyAlert(ntfy_topic)
+    return ntfy.send(message, title=title)
 
 
 def get_stock_name(ticker: str, fallback_name: str) -> str:
@@ -140,7 +136,7 @@ def analyze_and_generate_charts():
 
 
 def send_daily_alerts(analysis_results):
-    """각 사용자에게 맞춤 알림 전송"""
+    """각 사용자에게 맞춤 ntfy 알림 전송"""
     today = datetime.now().strftime('%Y-%m-%d')
     db = StockDatabase()
     
@@ -158,7 +154,13 @@ def send_daily_alerts(analysis_results):
             print(f"  ⏸️  {user['name']} - 알림 비활성화 상태 (건너뜀)")
             continue
         
-        print(f"\n👤 {user['name']} 님에게 알림 전송 중...")
+        # ntfy 토픽 확인
+        ntfy_topic = user.get('ntfy_topic')
+        if not ntfy_topic:
+            print(f"  ⚠️  {user['name']} - ntfy 토픽 미설정 (건너뜀)")
+            continue
+        
+        print(f"\n👤 {user['name']} 님에게 ntfy 알림 전송 중...")
         
         # 사용자 관심 종목 가져오기
         watchlist = db.get_user_watchlist_with_names(user['name'])
@@ -167,35 +169,15 @@ def send_daily_alerts(analysis_results):
             print(f"  ⚠️  관심 종목이 없습니다.")
             continue
         
-        # 요약 메시지
-        message = f"🌅 {user['name']}님, 좋은 아침입니다!\n\n"
-        message += f"📅 {today}\n"
-        message += f"📊 오늘의 매수 전략 분석\n\n"
-        message += f"관심 종목: {len(watchlist)}개\n"
-        message += "━━━━━━━━━━━━━━━━━━\n"
+        # 요약 메시지 생성
+        message = f"좋은 아침입니다! 📅 {today}\n\n"
+        message += f"📊 관심 종목 {len(watchlist)}개 분석\n"
+        message += "━━━━━━━━━━━━━━━━━━\n\n"
         
-        # 종목 리스트 추가 (한국은 이름, 미국은 티커)
-        for idx, stock in enumerate(watchlist, 1):
-            ticker = stock['ticker']
-            name = stock['name']
-            if ticker.isdigit():  # 한국 주식
-                message += f"{idx}. {name}\n"
-            else:  # 미국 주식
-                message += f"{idx}. {ticker}\n"
-        message += "\n"
-        
-        # 종목별 알림
-        sent_charts = 0
+        # 종목별 분석 결과
         for stock in watchlist:
             ticker = stock['ticker']
             name = stock['name']
-            
-            # 차트 파일 찾기
-            chart_path = Path('charts') / ticker / f"{today}_{ticker}_{name.replace(' ', '_')}_volatility.png"
-            
-            if not chart_path.exists():
-                message += f"⚠️  {ticker} ({name}): 차트 없음\n"
-                continue
             
             # 분석 데이터 가져오기
             result = analysis_results.get(ticker)
@@ -204,52 +186,41 @@ def send_daily_alerts(analysis_results):
             is_korean = ticker.isdigit()
             
             if not result or not result['data']:
-                # data가 없으면 간단한 메시지만
                 if is_korean:
-                    stock_message = f"📊 {name} ({ticker})\n"
+                    message += f"📊 {name}\n"
                 else:
-                    stock_message = f"📊 {ticker} - {name}\n"
+                    message += f"📊 {ticker}\n"
+                message += "   분석 데이터 없음\n\n"
             else:
-                # data가 있으면 매수 목표가 포함
                 data = result['data']
                 if is_korean:
-                    stock_message = f"📊 {name} ({ticker})\n\n"
-                    stock_message += f"🧪 테스트 매수: {data['target_05x']:,.0f}원 ({data['drop_05x']:.2f}% 하락)\n"
-                    stock_message += f"1차 매수 목표: {data['target_1x']:,.0f}원 ({data['drop_1x']:.2f}% 하락)\n"
-                    stock_message += f"2차 매수 목표: {data['target_2x']:,.0f}원 ({data['drop_2x']:.2f}% 하락)\n"
+                    message += f"📊 {name}\n"
+                    message += f"   🧪 {data['target_05x']:,.0f}원\n"
+                    message += f"   1σ {data['target_1x']:,.0f}원\n"
+                    message += f"   2σ {data['target_2x']:,.0f}원\n\n"
                 else:
-                    stock_message = f"📊 {ticker} - {name}\n\n"
-                    stock_message += f"🧪 테스트 매수: ${data['target_05x']:,.2f} ({data['drop_05x']:.2f}% 하락)\n"
-                    stock_message += f"1차 매수 목표: ${data['target_1x']:,.2f} ({data['drop_1x']:.2f}% 하락)\n"
-                    stock_message += f"2차 매수 목표: ${data['target_2x']:,.2f} ({data['drop_2x']:.2f}% 하락)\n"
-            
-            try:
-                send_photo(
-                    TELEGRAM_CONFIG['CHAT_ID'],
-                    str(chart_path),
-                    stock_message
-                )
-                sent_charts += 1
-                message += f"✅ {ticker}: 차트 전송 완료\n"
-                print(f"  ✅ {ticker} 차트 전송 완료")
-            except Exception as e:
-                message += f"❌ {ticker}: 전송 실패\n"
-                print(f"  ❌ {ticker} 차트 전송 실패: {e}")
+                    message += f"📊 {ticker}\n"
+                    message += f"   🧪 ${data['target_05x']:,.2f}\n"
+                    message += f"   1σ ${data['target_1x']:,.2f}\n"
+                    message += f"   2σ ${data['target_2x']:,.2f}\n\n"
         
-        # 요약 메시지 전송
-        message += f"\n━━━━━━━━━━━━━━━━━━\n"
-        message += f"✅ 총 {sent_charts}개 종목 차트 전송\n\n"
-        message += "💡 매수 시점:\n"
-        message += "  • 🧪 테스트: 표준편차 0.5배 하락 시\n"
-        message += "  • 1차: 표준편차 1배 하락 시\n"
-        message += "  • 2차: 표준편차 2배 하락 시\n\n"
-        message += "행운을 빕니다! 🍀"
+        message += "━━━━━━━━━━━━━━━━━━\n"
+        message += "💡 🧪=테스트, 1σ/2σ=매수목표\n"
+        message += "📱 상세 차트는 웹에서 확인!"
         
+        # ntfy로 전송
         try:
-            send_message(TELEGRAM_CONFIG['CHAT_ID'], message)
-            print(f"  ✅ 요약 메시지 전송 완료")
+            success = send_ntfy_message(
+                ntfy_topic,
+                message,
+                title=f"📈 오늘의 투자 분석 ({len(watchlist)}종목)"
+            )
+            if success:
+                print(f"  ✅ ntfy 알림 전송 완료")
+            else:
+                print(f"  ❌ ntfy 알림 전송 실패")
         except Exception as e:
-            print(f"  ❌ 요약 메시지 전송 실패: {e}")
+            print(f"  ❌ ntfy 알림 전송 실패: {e}")
     
     db.close()
 

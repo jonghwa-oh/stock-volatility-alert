@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}대시보드 - 주식 알림{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 헤더 -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold">📊 종목 분석</h1>
+            <p class="text-slate-400 text-sm mt-1">조회: {{ now.strftime('%Y-%m-%d %H:%M') }} (각 종목별 기준일 참고)</p>
+        </div>
+        <a href="{{ url_for('stocks.add_stock') }}"
+           class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+            <span>➕</span>
+            <span class="hidden sm:inline">종목 추가</span>
+        </a>
+    </div>
+    
+    <!-- 종목 카드 그리드 -->
+    {% if stocks %}
+    <div class="grid gap-4 sm:grid-cols-2">
+        {% for stock in stocks %}
+        <a href="{{ url_for('stocks.view_chart', ticker=stock.ticker) }}" 
+           class="block bg-slate-800 rounded-2xl p-5 border border-slate-700 card-hover cursor-pointer">
+            <!-- 종목 헤더 -->
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">{{ '🇰🇷' if stock.country == 'KR' else '🇺🇸' }}</span>
+                        <h3 class="font-bold text-lg">{{ stock.name }}</h3>
+                    </div>
+                    <p class="text-slate-400 text-sm">{{ stock.ticker }}</p>
+                </div>
+                
+                {% if stock.success %}
+                <div class="text-right">
+                    <p class="text-2xl font-bold">
+                        {% if stock.country == 'KR' %}
+                        {{ "{:,.0f}".format(stock.current_price) }}원
+                        {% else %}
+                        ${{ "{:,.2f}".format(stock.current_price) }}
+                        {% endif %}
+                    </p>
+                    <p class="text-sm text-slate-400">
+                        {% if stock.data_date %}
+                        {{ stock.data_date }}{% if stock.country == 'US' %} (미국){% endif %} 종가
+                        {% else %}
+                        현재가
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if stock.success %}
+            <!-- 목표가 정보 -->
+            <div class="space-y-3 mb-4">
+                <!-- 0.5σ -->
+                <div class="flex items-center justify-between p-3 bg-slate-700/50 rounded-xl">
+                    <div class="flex items-center gap-2">
+                        <span class="w-8 h-8 bg-yellow-500/20 text-yellow-400 rounded-lg flex items-center justify-center text-sm font-bold">0.5</span>
+                        <span class="text-sm text-slate-300">테스트 매수</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium">
+                            {% if stock.country == 'KR' %}
+                            {{ "{:,.0f}".format(stock.target_05x) }}원
+                            {% else %}
+                            ${{ "{:,.2f}".format(stock.target_05x) }}
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-red-400">▼{{ "{:.1f}".format(stock.drop_05x) }}%</p>
+                    </div>
+                </div>
+                
+                <!-- 1σ -->
+                <div class="flex items-center justify-between p-3 bg-slate-700/50 rounded-xl">
+                    <div class="flex items-center gap-2">
+                        <span class="w-8 h-8 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center text-sm font-bold">1σ</span>
+                        <span class="text-sm text-slate-300">1차 매수</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium">
+                            {% if stock.country == 'KR' %}
+                            {{ "{:,.0f}".format(stock.target_1x) }}원
+                            {% else %}
+                            ${{ "{:,.2f}".format(stock.target_1x) }}
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-red-400">▼{{ "{:.1f}".format(stock.drop_1x) }}%</p>
+                    </div>
+                </div>
+                
+                <!-- 2σ -->
+                <div class="flex items-center justify-between p-3 bg-slate-700/50 rounded-xl">
+                    <div class="flex items-center gap-2">
+                        <span class="w-8 h-8 bg-purple-500/20 text-purple-400 rounded-lg flex items-center justify-center text-sm font-bold">2σ</span>
+                        <span class="text-sm text-slate-300">2차 매수</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium">
+                            {% if stock.country == 'KR' %}
+                            {{ "{:,.0f}".format(stock.target_2x) }}원
+                            {% else %}
+                            ${{ "{:,.2f}".format(stock.target_2x) }}
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-red-400">▼{{ "{:.1f}".format(stock.drop_2x) }}%</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 변동성 표시 -->
+            <div class="flex items-center justify-between text-sm text-slate-400 mb-4">
+                <span>일일 변동성</span>
+                <span class="font-medium text-slate-200">{{ "{:.2f}".format(stock.volatility) }}%</span>
+            </div>
+            
+            {% else %}
+            <!-- 분석 실패 -->
+            <div class="text-center py-8 text-slate-500">
+                <p class="text-3xl mb-2">⚠️</p>
+                <p>분석 데이터 없음</p>
+                <p class="text-sm">{{ stock.error or '데이터를 가져올 수 없습니다' }}</p>
+            </div>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- 빈 상태 -->
+    <div class="text-center py-16">
+        <div class="text-6xl mb-4">📭</div>
+        <h2 class="text-xl font-bold mb-2">등록된 종목이 없습니다</h2>
+        <p class="text-slate-400 mb-6">관심 종목을 추가하여 모니터링을 시작하세요</p>
+        <a href="{{ url_for('stocks.add_stock') }}"
+           class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+            ➕ 종목 추가하기
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

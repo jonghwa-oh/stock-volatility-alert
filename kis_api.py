@@ -316,9 +316,12 @@ class KISApi:
             print(f"❌ 데이터 처리 오류 ({ticker}): {e}")
             return None
     
+    # 거래소 코드 캐시 (티커 → 거래소)
+    _exchange_cache = {}
+    
     def get_exchange_code(self, ticker: str) -> str:
         """
-        티커로 거래소 코드 추측
+        티커로 거래소 코드 반환 (캐시 우선)
         
         Args:
             ticker: 종목코드
@@ -326,15 +329,237 @@ class KISApi:
         Returns:
             str: 거래소 코드 (NAS, NYS, AMS)
         """
-        # 나스닥 주요 종목들
-        nasdaq_tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 
-                          'TSLA', 'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 
-                          'CSCO', 'TQQQ', 'QQQ', 'SOXL', 'QLD', 'TECL']
+        ticker_upper = ticker.upper()
         
-        if ticker.upper() in nasdaq_tickers:
+        # 캐시에 있으면 반환
+        if ticker_upper in self._exchange_cache:
+            return self._exchange_cache[ticker_upper]
+        
+        # 알려진 ARCA(AMS) 상장 ETF (레버리지/인버스 ETF 대부분)
+        arca_etfs = [
+            'SOXL', 'SOXS', 'QLD', 'QID', 'TQQQ', 'SQQQ',  # 반도체/나스닥 레버리지
+            'TECL', 'TECS', 'SPXL', 'SPXS', 'UPRO', 'SPXU',  # 기술/S&P 레버리지
+            'TNA', 'TZA', 'LABU', 'LABD', 'FAS', 'FAZ',  # 소형주/바이오/금융 레버리지
+            'NUGT', 'DUST', 'JNUG', 'JDST', 'GDXU', 'GDXD',  # 금광 레버리지
+            'KORU', 'YANG', 'YINN', 'KWEB',  # 한국/중국 레버리지
+            'ERX', 'ERY', 'UCO', 'SCO', 'GUSH', 'DRIP',  # 에너지 레버리지
+            'TMF', 'TMV', 'TBT', 'TLT',  # 채권 레버리지
+            'UVXY', 'SVXY', 'VXX',  # 변동성
+        ]
+        
+        if ticker_upper in arca_etfs:
+            return "AMS"
+        
+        # 기본 추측 (레버리지 ETF는 대부분 ARCA)
+        leverage_keywords = ['3X', 'BULL', 'BEAR', 'ULTRA']
+        if any(kw in ticker_upper for kw in leverage_keywords):
+            return "AMS"
+        
+        # 알려진 나스닥 대형주
+        nasdaq_majors = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'META', 
+                         'TSLA', 'AVGO', 'COST', 'NFLX', 'AMD', 'PEP', 'ADBE', 
+                         'CSCO', 'QQQ', 'INTC', 'PYPL']
+        
+        if ticker_upper in nasdaq_majors:
             return "NAS"
-        else:
-            return "NYS"  # 기본값: 뉴욕증권거래소
+        
+        return "NAS"  # 기본값
+    
+    def _extract_exchange_from_rsym(self, rsym: str) -> Optional[str]:
+        """
+        rsym 필드에서 거래소 코드 추출
+        
+        Args:
+            rsym: API 응답의 rsym 값 (예: DNASTQQQ, DAMSSOXL)
+        
+        Returns:
+            str: 거래소 코드 (NAS, AMS, NYS) 또는 None
+        """
+        if rsym and len(rsym) >= 4:
+            # rsym 형식: D + 거래소(3자리) + 티커
+            exchange = rsym[1:4]
+            if exchange in ['NAS', 'AMS', 'NYS']:
+                return exchange
+        return None
+    
+    def get_overseas_stock_price_auto(self, ticker: str) -> Optional[dict]:
+        """
+        여러 거래소를 시도하여 해외주식 현재가 조회
+        rsym에서 거래소 코드를 추출하여 캐싱
+        
+        Args:
+            ticker: 종목코드
+        
+        Returns:
+            dict: 주식 시세 정보 또는 None
+        """
+        ticker_upper = ticker.upper()
+        
+        # 캐시된 거래소가 있으면 먼저 시도
+        if ticker_upper in self._exchange_cache:
+            cached_exchange = self._exchange_cache[ticker_upper]
+            result = self.get_overseas_stock_price(ticker, cached_exchange)
+            if result and result.get('current_price', 0) > 0:
+                return result
+        
+        # 시도할 거래소 순서
+        exchanges = ['NAS', 'AMS', 'NYS']
+        
+        # 추측 거래소를 먼저 시도
+        guessed = self.get_exchange_code(ticker)
+        if guessed in exchanges:
+            exchanges.remove(guessed)
+            exchanges.insert(0, guessed)
+        
+        for exchange in exchanges:
+            result = self._get_overseas_stock_price_with_rsym(ticker, exchange)
+            if result and result.get('current_price', 0) > 0:
+                # rsym에서 실제 거래소 추출하여 캐싱
+                rsym = result.get('_rsym', '')
+                actual_exchange = self._extract_exchange_from_rsym(rsym)
+                if actual_exchange:
+                    self._exchange_cache[ticker_upper] = actual_exchange
+                    print(f"  ✅ {ticker} 거래소 캐싱: {actual_exchange}")
+                else:
+                    self._exchange_cache[ticker_upper] = exchange
+                    print(f"  ✅ {ticker} 거래소 확인: {exchange}")
+                return result
+        
+        print(f"  ❌ {ticker} 모든 거래소에서 조회 실패")
+        return None
+    
+    def _get_overseas_stock_price_with_rsym(self, ticker: str, exchange: str) -> Optional[dict]:
+        """
+        해외주식 현재가 조회 (rsym 포함)
+        """
+        url = f"{self.base_url}/uapi/overseas-price/v1/quotations/price"
+        headers = self.auth.get_headers(tr_id="HHDFS00000300")
+        params = {"AUTH": "", "EXCD": exchange, "SYMB": ticker}
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':
+                output = result.get('output', {})
+                
+                def safe_float(value, default=0.0):
+                    try:
+                        return float(value) if value and value != '' else default
+                    except (ValueError, TypeError):
+                        return default
+                
+                def safe_int(value, default=0):
+                    try:
+                        return int(value) if value and value != '' else default
+                    except (ValueError, TypeError):
+                        return default
+                
+                current_price = safe_float(output.get('last'))
+                
+                return {
+                    'ticker': ticker,
+                    'name': output.get('name', ticker),
+                    'current_price': current_price,
+                    'open_price': safe_float(output.get('open')),
+                    'high_price': safe_float(output.get('high')),
+                    'low_price': safe_float(output.get('low')),
+                    'prev_close': safe_float(output.get('base')),
+                    'change_price': safe_float(output.get('diff')),
+                    'change_rate': safe_float(output.get('rate')),
+                    'volume': safe_int(output.get('tvol')),
+                    'exchange': exchange,
+                    '_rsym': output.get('rsym', ''),  # 거래소 추출용
+                    'timestamp': datetime.now()
+                }
+            return None
+        except Exception as e:
+            return None
+    
+    def get_kr_minute_price(self, ticker: str, date: str, interval: int = 1) -> list:
+        """
+        한국 주식 분봉 조회
+        
+        Args:
+            ticker: 종목코드 (6자리)
+            date: 조회일 (YYYYMMDD)
+            interval: 분봉 간격 (1, 5, 15, 30, 60)
+        
+        Returns:
+            list: 분봉 데이터 리스트
+        """
+        url = f"{self.base_url}/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice"
+        
+        # TR_ID: FHKST03010200 (주식당일분봉조회)
+        headers = self.auth.get_headers(tr_id="FHKST03010200")
+        
+        params = {
+            "FID_ETC_CLS_CODE": "",
+            "FID_COND_MRKT_DIV_CODE": "J",
+            "FID_INPUT_ISCD": ticker,
+            "FID_INPUT_HOUR_1": "090000",  # 시작 시간
+            "FID_PW_DATA_INCU_YN": "Y"
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':
+                return result.get('output2', [])
+            return []
+        except Exception as e:
+            print(f"  ❌ 한국 분봉 조회 오류: {e}")
+            return []
+    
+    def get_us_minute_price(self, ticker: str, exchange: str, date: str, interval: int = 1) -> list:
+        """
+        미국 주식 분봉 조회
+        
+        Args:
+            ticker: 종목코드
+            exchange: 거래소 코드 (NAS, NYS, AMS)
+            date: 조회일 (YYYYMMDD)
+            interval: 분봉 간격 (1, 5, 15, 30, 60)
+        
+        Returns:
+            list: 분봉 데이터 리스트
+        """
+        url = f"{self.base_url}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+        
+        # TR_ID: HHDFS76950200 (해외주식분봉조회)
+        headers = self.auth.get_headers(tr_id="HHDFS76950200")
+        
+        # 분봉 간격 코드 변환
+        interval_code = {1: "1", 5: "5", 15: "15", 30: "30", 60: "60"}.get(interval, "1")
+        
+        params = {
+            "AUTH": "",
+            "EXCD": exchange,
+            "SYMB": ticker,
+            "NMIN": interval_code,
+            "PINC": "1",
+            "NEXT": "",
+            "NREC": "120",  # 최대 120건
+            "FILL": "",
+            "KEYB": ""
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            if result.get('rt_cd') == '0':
+                return result.get('output2', [])
+            return []
+        except Exception as e:
+            print(f"  ❌ 미국 분봉 조회 오류: {e}")
+            return []
     
     def close(self):
         """리소스 정리"""
