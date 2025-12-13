@@ -68,3 +68,44 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # 미디어 서버 (Jellyfin)
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - ./media:/media
+    environment:
+      - TZ=Asia/Seoul
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 파일 공유 (Samba)
+  samba:
+    image: dperson/samba:latest
+    container_name: samba
+    restart: unless-stopped
+    ports:
+      - "445:445"
+    volumes:
+      - ./media:/share/media
+    environment:
+      - TZ=Asia/Seoul
+      - USERID=1000
+      - GROUPID=1000
+    command: >
+      -u "jjongz;media1234"
+      -s "Media;/share/media;yes;no;no;jjongz;jjongz"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
