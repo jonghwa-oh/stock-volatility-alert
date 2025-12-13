@@ -36,10 +36,14 @@
                 {% if stock.success %}
                 <div class="text-right">
                     <p class="text-2xl font-bold">
-                        {% if stock.country == 'KR' %}
-                        {{ "{:,.0f}".format(stock.current_price) }}원
+                        {% if stock.current_price %}
+                            {% if stock.country == 'KR' %}
+                            {{ "{:,.0f}".format(stock.current_price) }}원
+                            {% else %}
+                            ${{ "{:,.2f}".format(stock.current_price) }}
+                            {% endif %}
                         {% else %}
-                        ${{ "{:,.2f}".format(stock.current_price) }}
+                        -
                         {% endif %}
                     </p>
                     <p class="text-sm text-slate-400">
@@ -126,7 +130,7 @@
             <!-- 변동성 표시 -->
             <div class="flex items-center justify-between text-sm text-slate-400 mb-4">
                 <span>일일 변동성</span>
-                <span class="font-medium text-slate-200">{{ "{:.2f}".format(stock.volatility) }}%</span>
+                <span class="font-medium text-slate-200">{% if stock.volatility %}{{ "{:.2f}".format(stock.volatility) }}%{% else %}-{% endif %}</span>
             </div>
             
             {% else %}
