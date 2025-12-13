@@ -2,7 +2,7 @@
 # Mac Mini 자동 배포 스크립트
 # cron으로 1분마다 실행하여 GitHub 변경사항 확인 후 자동 배포
 
-PROJECT_PATH="$HOME/stock-volatility-alert"
+PROJECT_PATH="$HOME/projects/stock-volatility-alert"
 LOG_FILE="$PROJECT_PATH/deploy.log"
 LOCK_FILE="/tmp/stock_deploy.lock"
 

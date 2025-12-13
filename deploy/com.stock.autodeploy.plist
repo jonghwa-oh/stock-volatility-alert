@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/jjongz/stock-volatility-alert/deploy/mac_auto_deploy.sh</string>
+        <string>/Users/jjongz/projects/stock-volatility-alert/deploy/mac_auto_deploy.sh</string>
     </array>
     
     <key>StartInterval</key>
@@ -18,10 +18,10 @@
     <true/>
     
     <key>StandardOutPath</key>
-    <string>/Users/jjongz/stock-volatility-alert/deploy_stdout.log</string>
+    <string>/Users/jjongz/projects/stock-volatility-alert/deploy_stdout.log</string>
     
     <key>StandardErrorPath</key>
-    <string>/Users/jjongz/stock-volatility-alert/deploy_stderr.log</string>
+    <string>/Users/jjongz/projects/stock-volatility-alert/deploy_stderr.log</string>
     
     <key>EnvironmentVariables</key>
     <dict>
