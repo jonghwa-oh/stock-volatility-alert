@@ -73,8 +73,7 @@ services:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
     restart: unless-stopped
-    ports:
-      - "8096:8096"
+    network_mode: "host"
     volumes:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache

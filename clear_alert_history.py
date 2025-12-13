@@ -26,3 +26,4 @@ def clear_alert_history():
 if __name__ == '__main__':
     clear_alert_history()
 
+

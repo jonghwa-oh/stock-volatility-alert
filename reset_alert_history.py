@@ -56,3 +56,4 @@ def reset_alert_history(db_path='data/stock_data.db'):
 if __name__ == '__main__':
     reset_alert_history()
 
+
