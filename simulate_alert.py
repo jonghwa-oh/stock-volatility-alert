@@ -127,14 +127,37 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
     # 2. 해당 날짜 분봉 데이터 가져오기
     print(f"\n[2] 📊 {target_date} 분봉 데이터 조회...")
     
-    cursor.execute('''
-        SELECT datetime, price, volume 
-        FROM minute_prices 
-        WHERE ticker = ? AND date(datetime) = ?
-        ORDER BY datetime ASC
-    ''', (ticker, target_date))
-    
-    minute_data = cursor.fetchall()
+    # 미국 주식은 market_date (미국 거래일) 기준, 한국 주식은 datetime 기준
+    if country == 'US':
+        # market_date 컬럼이 있으면 사용 (yfinance로 수집된 데이터)
+        cursor.execute('''
+            SELECT datetime, price, volume 
+            FROM minute_prices 
+            WHERE ticker = ? AND market_date = ?
+            ORDER BY datetime ASC
+        ''', (ticker, target_date))
+        
+        minute_data = cursor.fetchall()
+        
+        # market_date가 없으면 기존 방식으로 fallback
+        if not minute_data:
+            print(f"   ⚠️ market_date 데이터 없음, datetime 기준으로 조회...")
+            cursor.execute('''
+                SELECT datetime, price, volume 
+                FROM minute_prices 
+                WHERE ticker = ? AND date(datetime) = ?
+                ORDER BY datetime ASC
+            ''', (ticker, target_date))
+            minute_data = cursor.fetchall()
+    else:
+        # 한국 주식은 datetime 기준
+        cursor.execute('''
+            SELECT datetime, price, volume 
+            FROM minute_prices 
+            WHERE ticker = ? AND date(datetime) = ?
+            ORDER BY datetime ASC
+        ''', (ticker, target_date))
+        minute_data = cursor.fetchall()
     
     if not minute_data:
         print(f"❌ {target_date} 분봉 데이터 없음")

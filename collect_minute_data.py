@@ -125,6 +125,11 @@ def collect_us_minute_data_yfinance(db: StockDatabase,
     - 1분봉: 최근 7일
     - 5분봉: 최근 60일
     - 1시간봉: 최근 730일
+    
+    저장 형식:
+    - datetime: 한국 시간 (KST) - 호환성 유지
+    - datetime_utc: UTC 시간
+    - market_date: 미국 시장 거래일 (미국 동부 시간 기준 날짜)
     """
     
     if not YFINANCE_AVAILABLE:
@@ -190,44 +195,60 @@ def collect_us_minute_data_yfinance(db: StockDatabase,
         print(f"     시작: {df.index[0]}")
         print(f"     종료: {df.index[-1]}")
         
-        # 정규장 시간만 필터링 (미국 동부 9:30 AM ~ 4:00 PM)
-        # yfinance는 이미 정규장 시간만 반환함
-        
         # 데이터 저장
         for idx, row in df.iterrows():
             try:
-                # 타임존 처리 (yfinance는 미국 시간 반환, UTC로 변환 후 한국시간으로)
-                if idx.tzinfo is not None:
-                    # 한국 시간으로 변환
-                    dt_utc = idx.tz_convert('UTC')
-                    dt_kst = dt_utc.tz_convert('Asia/Seoul')
-                    dt_str = dt_kst.strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    dt_str = idx.strftime('%Y-%m-%d %H:%M:%S')
-                
                 price = float(row['Close'])
                 volume = int(row['Volume'])
                 
                 if price > 0:
+                    # 타임존 처리
+                    if idx.tzinfo is not None:
+                        # UTC 시간
+                        dt_utc = idx.tz_convert('UTC')
+                        datetime_utc = dt_utc.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # 한국 시간 (호환성 유지)
+                        dt_kst = dt_utc.tz_convert('Asia/Seoul')
+                        datetime_kst = dt_kst.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # 미국 시장 거래일 (미국 동부 시간 기준)
+                        dt_us = idx.tz_convert('America/New_York')
+                        market_date = dt_us.strftime('%Y-%m-%d')
+                    else:
+                        # 타임존 없으면 그대로 사용 (미국 시간으로 가정)
+                        datetime_kst = idx.strftime('%Y-%m-%d %H:%M:%S')
+                        datetime_utc = idx.strftime('%Y-%m-%d %H:%M:%S')
+                        market_date = idx.strftime('%Y-%m-%d')
+                    
                     db.insert_minute_price(
                         ticker=ticker,
                         ticker_name=name,
-                        datetime_str=dt_str,
+                        datetime_str=datetime_kst,
                         price=price,
-                        volume=volume
+                        volume=volume,
+                        datetime_utc=datetime_utc,
+                        market_date=market_date
                     )
                     total_count += 1
                     
             except Exception as e:
                 print(f"  ⚠️ 데이터 파싱 오류: {e}")
         
-        # 날짜별 통계 출력
+        # 미국 거래일별 통계 출력
         if not df.empty:
-            dates = df.index.date
-            unique_dates = sorted(set(dates))
-            for d in unique_dates:
-                count = sum(1 for x in dates if x == d)
-                print(f"  📅 {d}: {count}건 (정규장)")
+            # 미국 동부 시간으로 변환해서 날짜별 집계
+            us_dates = {}
+            for idx in df.index:
+                if idx.tzinfo is not None:
+                    dt_us = idx.tz_convert('America/New_York')
+                    us_date = dt_us.date()
+                else:
+                    us_date = idx.date()
+                us_dates[us_date] = us_dates.get(us_date, 0) + 1
+            
+            for d in sorted(us_dates.keys()):
+                print(f"  📅 {d} (미국): {us_dates[d]}건 (정규장)")
                 
     except Exception as e:
         print(f"  ❌ yfinance 조회 오류: {e}")

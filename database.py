@@ -58,12 +58,24 @@ class StockDatabase:
                 ticker TEXT NOT NULL,
                 ticker_name TEXT NOT NULL,
                 datetime TIMESTAMP NOT NULL,
+                datetime_utc TIMESTAMP,
+                market_date DATE,
                 price REAL NOT NULL,
                 volume INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(ticker, datetime)
             )
         ''')
+        
+        # minute_prices에 market_date 컬럼 추가 (기존 테이블)
+        try:
+            cursor.execute("ALTER TABLE minute_prices ADD COLUMN datetime_utc TIMESTAMP")
+        except:
+            pass
+        try:
+            cursor.execute("ALTER TABLE minute_prices ADD COLUMN market_date DATE")
+        except:
+            pass
         
         # 통계 캐시 테이블 (표준편차 등)
         cursor.execute('''
@@ -251,17 +263,25 @@ class StockDatabase:
             return False
     
     def insert_minute_price(self, ticker: str, ticker_name: str, 
-                           datetime_str: str, price: float, volume: int = 0):
-        """분봉 데이터 저장"""
+                           datetime_str: str, price: float, volume: int = 0,
+                           datetime_utc: str = None, market_date: str = None):
+        """
+        분봉 데이터 저장
+        
+        Args:
+            datetime_str: 로컬 시간 (호환성 유지)
+            datetime_utc: UTC 시간 (선택)
+            market_date: 시장 거래일 (선택, 예: 미국 주식은 미국 날짜)
+        """
         conn = self.connect()
         cursor = conn.cursor()
         
         try:
             cursor.execute('''
                 INSERT OR REPLACE INTO minute_prices 
-                (ticker, ticker_name, datetime, price, volume)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (ticker, ticker_name, datetime_str, price, volume))
+                (ticker, ticker_name, datetime, datetime_utc, market_date, price, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (ticker, ticker_name, datetime_str, datetime_utc, market_date, price, volume))
             conn.commit()
             return True
         except Exception as e:
@@ -269,15 +289,19 @@ class StockDatabase:
             return False
     
     def insert_minute_prices_bulk(self, data: List[Tuple]):
-        """분봉 데이터 대량 저장"""
+        """
+        분봉 데이터 대량 저장
+        
+        data 형식: [(ticker, ticker_name, datetime, datetime_utc, market_date, price, volume), ...]
+        """
         conn = self.connect()
         cursor = conn.cursor()
         
         try:
             cursor.executemany('''
                 INSERT OR REPLACE INTO minute_prices 
-                (ticker, ticker_name, datetime, price, volume)
-                VALUES (?, ?, ?, ?, ?)
+                (ticker, ticker_name, datetime, datetime_utc, market_date, price, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', data)
             conn.commit()
             return True
