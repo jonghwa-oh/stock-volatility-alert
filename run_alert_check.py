@@ -99,9 +99,9 @@ def test_all():
     
     # 단순 메시지 테스트
     print("\n  [4-1] 단순 메시지 테스트...")
-    result1 = ntfy.send_message(
-        title="🧪 테스트 알림",
-        message=f"테스트 시간: {datetime.now().strftime('%H:%M:%S')}"
+    result1 = ntfy.send(
+        message=f"🧪 테스트 알림 - 시간: {datetime.now().strftime('%H:%M:%S')}",
+        title="알림 테스트"
     )
     print(f"  결과: {'✅ 성공' if result1 else '❌ 실패'}")
     
