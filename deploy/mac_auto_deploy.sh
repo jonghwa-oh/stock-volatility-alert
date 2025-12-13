@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mac Mini 자동 배포 스크립트
-# cron으로 1분마다 실행하여 GitHub 변경사항 확인 후 자동 배포
+# launchd로 1분마다 실행하여 GitHub 변경사항 확인 후 자동 배포
 
 PROJECT_PATH="$HOME/projects/stock-volatility-alert"
 LOG_FILE="$PROJECT_PATH/deploy.log"
@@ -48,32 +48,44 @@ if [ "$LOCAL" != "$REMOTE" ]; then
     COMMIT_MSG=$(git log -1 --pretty=format:"%s")
     COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
     
-    # 빌드 방식 결정 (새 파일 추가 시에도 --no-cache 필요)
-    if echo "$CHANGED_FILES" | grep -qE "(Dockerfile|requirements\.txt)"; then
-        BUILD_TYPE="전체 빌드 (--no-cache)"
-        log "🐳 $BUILD_TYPE"
-        docker-compose build --no-cache
-    else
-        BUILD_TYPE="빠른 빌드 (--build)"
-        log "🐳 $BUILD_TYPE"
-        docker-compose up -d --build
-        log "✅ 배포 완료!"
-        log "   📦 변경: ${CHANGED_COUNT}개 파일"
-        log "   🔧 빌드: ${BUILD_TYPE}"
-        log "   💬 커밋: ${COMMIT_MSG}"
-        log "   👤 작성자: ${COMMIT_AUTHOR}"
-        log ""
-        exit 0
-    fi
-    
-    # 컨테이너 재시작
-    docker-compose up -d
-    
-    log "✅ 배포 완료!"
-    log "   📦 변경: ${CHANGED_COUNT}개 파일"
-    log "   🔧 빌드: ${BUILD_TYPE}"
+    log "   📦 변경 파일: ${CHANGED_COUNT}개"
     log "   💬 커밋: ${COMMIT_MSG}"
     log "   👤 작성자: ${COMMIT_AUTHOR}"
+    
+    # ============================================
+    # 빌드 방식 결정 (파일 유형별 분기)
+    # ============================================
+    
+    # 1️⃣ Dockerfile 또는 requirements.txt 변경 → 전체 빌드 (--no-cache)
+    if echo "$CHANGED_FILES" | grep -qE "^(Dockerfile|requirements\.txt)$"; then
+        BUILD_TYPE="🔴 전체 빌드 (--no-cache)"
+        log "🐳 $BUILD_TYPE"
+        log "   → Dockerfile/requirements.txt 변경 감지"
+        docker-compose build --no-cache
+        docker-compose up -d
+    
+    # 2️⃣ 소스 코드 변경 (.py, .html, .css, .js 등) → 빠른 빌드 (--build)
+    elif echo "$CHANGED_FILES" | grep -qE "\.(py|html|css|js|json|sh)$"; then
+        BUILD_TYPE="🟡 빠른 빌드 (--build)"
+        log "🐳 $BUILD_TYPE"
+        log "   → 소스 파일 변경 감지"
+        docker-compose up -d --build
+    
+    # 3️⃣ docker-compose.yml 변경 → 빌드 없이 재시작
+    elif echo "$CHANGED_FILES" | grep -qE "^docker-compose\.yml$"; then
+        BUILD_TYPE="🟢 재시작 (빌드 없음)"
+        log "🐳 $BUILD_TYPE"
+        log "   → docker-compose.yml 변경 감지"
+        docker-compose up -d
+    
+    # 4️⃣ 기타 파일 (README, .md 등) → 재시작만
+    else
+        BUILD_TYPE="⚪ 재시작만 (변경 없음)"
+        log "🐳 $BUILD_TYPE"
+        log "   → 빌드 불필요한 파일만 변경됨"
+        docker-compose up -d
+    fi
+    
+    log "✅ 배포 완료! ($BUILD_TYPE)"
     log ""
 fi
-
