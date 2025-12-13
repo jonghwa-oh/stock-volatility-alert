@@ -19,8 +19,14 @@ def create_app():
                 static_folder='static')
     
     # 설정
-    app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
+    app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'stock-alert-secret-key-2024')
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    
+    # 세션 쿠키 설정 (Tailscale IP 호환)
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = False  # HTTP 사용
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_DOMAIN'] = None   # 모든 도메인 허용
     
     # 블루프린트 등록
     app.register_blueprint(auth_bp)
@@ -51,5 +57,8 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+
+
 
 
