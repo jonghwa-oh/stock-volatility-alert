@@ -113,6 +113,42 @@ def delete_stock(ticker):
     return redirect(url_for('stocks.list_stocks'))
 
 
+@stocks_bp.route('/alerts')
+@login_required
+def view_alerts():
+    """알림 내역 조회"""
+    username = session.get('user')
+    ticker_filter = request.args.get('ticker', None)
+    
+    db = StockDatabase()
+    user = db.get_user_by_name(username)
+    
+    if not user:
+        db.close()
+        return redirect(url_for('auth.login'))
+    
+    # 알림 내역 조회
+    if ticker_filter:
+        alerts = db.get_user_alerts(user['id'], ticker=ticker_filter, limit=100)
+    else:
+        alerts = db.get_user_alerts(user['id'], limit=100)
+    
+    # 종목별로 그룹화
+    alerts_by_ticker = db.get_alerts_by_ticker(user['id'])
+    
+    # 종목 목록 (필터용)
+    watchlist = db.get_user_watchlist_with_names(username)
+    
+    db.close()
+    
+    return render_template('stocks/alerts.html',
+                          username=username,
+                          alerts=alerts,
+                          alerts_by_ticker=alerts_by_ticker,
+                          watchlist=watchlist,
+                          ticker_filter=ticker_filter)
+
+
 @stocks_bp.route('/chart/<ticker>')
 @login_required
 def view_chart(ticker):

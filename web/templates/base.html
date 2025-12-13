@@ -60,9 +60,14 @@
                         <span class="hidden sm:inline">대시보드</span>
                     </a>
                     <a href="{{ url_for('stocks.list_stocks') }}" 
-                       class="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors {% if 'stocks' in request.endpoint %}bg-slate-700{% endif %}">
+                       class="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors {% if request.endpoint == 'stocks.list_stocks' or request.endpoint == 'stocks.add_stock' %}bg-slate-700{% endif %}">
                         <span class="sm:hidden">📋</span>
                         <span class="hidden sm:inline">종목 관리</span>
+                    </a>
+                    <a href="{{ url_for('stocks.view_alerts') }}" 
+                       class="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors {% if request.endpoint == 'stocks.view_alerts' %}bg-slate-700{% endif %}">
+                        <span class="sm:hidden">🔔</span>
+                        <span class="hidden sm:inline">알림 내역</span>
                     </a>
                     <a href="{{ url_for('main.settings') }}" 
                        class="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors {% if request.endpoint == 'main.settings' %}bg-slate-700{% endif %}">

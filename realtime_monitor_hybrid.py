@@ -274,18 +274,12 @@ class HybridRealtimeMonitor:
         
         message += "\n📊 차트는 오늘 아침 알림을 확인하세요"
         
-        # DB에 기록 (알림 시간 여부와 상관없이 항상)
+        today = now.date().isoformat()
         conn = self.db.connect()
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO alert_history 
-            (ticker, ticker_name, country, alert_level, target_price, current_price, drop_rate, alert_time, sent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (ticker, name, country, level, target_price, current_price, drop_rate, now.isoformat(), 1 if send_now else 0))
-        conn.commit()
         
         # 알림 전송 (알림 시간일 때만)
-        log_debug(f"  📤 [{ticker}] DB 기록 완료, send_now={send_now}")
+        log_debug(f"  📤 [{ticker}] send_now={send_now}")
         
         if send_now:
             users = self.db.get_all_users()
@@ -315,6 +309,11 @@ class HybridRealtimeMonitor:
                     log_debug(f"  ⏭️ [{ticker}] {user['name']} - 관심 종목 아님 (건너뜀)")
                     continue
                 
+                # 🔴 오늘 해당 종목/레벨 알림 이미 발송 여부 체크 (하루 중복 방지)
+                if self.db.check_alert_sent_today(user['id'], ticker, level):
+                    log_debug(f"  ⏭️ [{ticker}] {user['name']} - 오늘 이미 {level} 알림 발송됨 (건너뜀)")
+                    continue
+                
                 try:
                     # 사용자별 ntfy 토픽으로 알림 전송
                     ntfy_topic = user.get('ntfy_topic')
@@ -334,6 +333,18 @@ class HybridRealtimeMonitor:
                     )
                     
                     if success:
+                        # 🔴 알림 발송 성공 시 DB에 기록 (사용자별)
+                        self.db.record_alert(
+                            user_id=user['id'],
+                            ticker=ticker,
+                            ticker_name=name,
+                            country=country,
+                            alert_level=level,
+                            target_price=target_price,
+                            current_price=current_price,
+                            drop_rate=drop_rate,
+                            sent=True
+                        )
                         log_success(f"  ✅ [{ticker}] {user['name']}님에게 {level_text} 매수 알림 전송 완료!")
                         sent_to_users.append(user['name'])
                     else:
@@ -345,10 +356,10 @@ class HybridRealtimeMonitor:
             if sent_to_users:
                 log(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송 완료: {', '.join(sent_to_users)}")
             else:
-                log_warning(f"⚠️ {name} ({ticker}) {level_text} - 알림 대상 사용자 없음")
+                log_warning(f"⚠️ {name} ({ticker}) {level_text} - 알림 대상 사용자 없음 또는 이미 발송됨")
         else:
-            # 알림 시간 외에는 DB에만 기록
-            log(f"💾 {name} ({ticker}) {level_text} 매수 시점 기록 (알림 시간 외: {now.strftime('%H:%M:%S')})")
+            # 알림 시간 외에는 로그만
+            log(f"💾 {name} ({ticker}) {level_text} 매수 시점 감지 (알림 시간 외: {now.strftime('%H:%M:%S')})")
         
         # 알림 이력 기록 (중복 방지용)
         if ticker not in self.alert_history:

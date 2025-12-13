@@ -175,22 +175,35 @@ class StockDatabase:
             )
         ''')
         
-        # 알림 이력 테이블 (놓친 알림 추적)
+        # 알림 이력 테이블 (놓친 알림 추적 + 중복 방지)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS alert_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
                 ticker TEXT NOT NULL,
                 ticker_name TEXT NOT NULL,
                 country TEXT NOT NULL,
                 alert_level TEXT NOT NULL,
+                alert_date TEXT NOT NULL,
                 target_price REAL NOT NULL,
                 current_price REAL NOT NULL,
                 drop_rate REAL NOT NULL,
                 alert_time TIMESTAMP NOT NULL,
                 sent BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, ticker, alert_date, alert_level)
             )
         ''')
+        
+        # alert_history에 user_id, alert_date 컬럼 추가 (기존 테이블 업데이트)
+        try:
+            cursor.execute("ALTER TABLE alert_history ADD COLUMN user_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE alert_history ADD COLUMN alert_date TEXT")
+        except sqlite3.OperationalError:
+            pass
         
         # 인덱스 생성
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_daily_ticker_date ON daily_prices(ticker, date)')
@@ -848,6 +861,141 @@ class StockDatabase:
         cursor.execute('DELETE FROM settings WHERE key = ?', (key,))
         conn.commit()
         print(f"✅ 설정 삭제: {key}")
+    
+    # ==================== 알림 관련 ====================
+    
+    def check_alert_sent_today(self, user_id: int, ticker: str, alert_level: str) -> bool:
+        """오늘 해당 종목/레벨의 알림이 이미 발송되었는지 확인
+        
+        Args:
+            user_id: 사용자 ID
+            ticker: 종목 코드
+            alert_level: 알림 레벨 ('0.5x', '1x', '2x' 등)
+        
+        Returns:
+            True: 이미 발송됨 (중복), False: 발송 안됨
+        """
+        from datetime import date
+        
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        today = date.today().isoformat()
+        
+        cursor.execute('''
+            SELECT id FROM alert_history 
+            WHERE user_id = ? AND ticker = ? AND alert_date = ? AND alert_level = ?
+        ''', (user_id, ticker, today, alert_level))
+        
+        return cursor.fetchone() is not None
+    
+    def record_alert(self, user_id: int, ticker: str, ticker_name: str, country: str,
+                     alert_level: str, target_price: float, current_price: float, 
+                     drop_rate: float, sent: bool = True) -> bool:
+        """알림 기록 저장 (중복 시 무시)
+        
+        Args:
+            user_id: 사용자 ID
+            ticker: 종목 코드
+            ticker_name: 종목명
+            country: 국가 (KR/US)
+            alert_level: 알림 레벨 ('0.5x', '1x', '2x' 등)
+            target_price: 목표가
+            current_price: 현재가
+            drop_rate: 하락률
+            sent: 발송 여부
+        
+        Returns:
+            True: 저장 성공 (새로운 알림), False: 중복으로 스킵
+        """
+        from datetime import date, datetime
+        
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        today = date.today().isoformat()
+        now = datetime.now().isoformat()
+        
+        try:
+            cursor.execute('''
+                INSERT INTO alert_history 
+                (user_id, ticker, ticker_name, country, alert_level, alert_date, 
+                 target_price, current_price, drop_rate, alert_time, sent)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, ticker, ticker_name, country, alert_level, today,
+                  target_price, current_price, drop_rate, now, sent))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            # 중복 (UNIQUE 제약 위반)
+            return False
+    
+    def get_user_alerts(self, user_id: int, ticker: str = None, limit: int = 50) -> List[Dict]:
+        """사용자 알림 내역 조회
+        
+        Args:
+            user_id: 사용자 ID
+            ticker: 종목 코드 (None이면 전체)
+            limit: 최대 개수
+        
+        Returns:
+            알림 내역 리스트 (최신순)
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+        
+        if ticker:
+            cursor.execute('''
+                SELECT id, ticker, ticker_name, country, alert_level, alert_date,
+                       target_price, current_price, drop_rate, alert_time, sent
+                FROM alert_history 
+                WHERE user_id = ? AND ticker = ?
+                ORDER BY alert_time DESC
+                LIMIT ?
+            ''', (user_id, ticker, limit))
+        else:
+            cursor.execute('''
+                SELECT id, ticker, ticker_name, country, alert_level, alert_date,
+                       target_price, current_price, drop_rate, alert_time, sent
+                FROM alert_history 
+                WHERE user_id = ?
+                ORDER BY alert_time DESC
+                LIMIT ?
+            ''', (user_id, limit))
+        
+        alerts = []
+        for row in cursor.fetchall():
+            alerts.append({
+                'id': row[0],
+                'ticker': row[1],
+                'ticker_name': row[2],
+                'country': row[3],
+                'alert_level': row[4],
+                'alert_date': row[5],
+                'target_price': row[6],
+                'current_price': row[7],
+                'drop_rate': row[8],
+                'alert_time': row[9],
+                'sent': row[10]
+            })
+        return alerts
+    
+    def get_alerts_by_ticker(self, user_id: int) -> Dict[str, List[Dict]]:
+        """종목별로 그룹화된 알림 내역 조회
+        
+        Returns:
+            {ticker: [alerts...], ...} 형태
+        """
+        alerts = self.get_user_alerts(user_id, limit=200)
+        
+        by_ticker = {}
+        for alert in alerts:
+            ticker = alert['ticker']
+            if ticker not in by_ticker:
+                by_ticker[ticker] = []
+            by_ticker[ticker].append(alert)
+        
+        return by_ticker
 
 
 if __name__ == "__main__":

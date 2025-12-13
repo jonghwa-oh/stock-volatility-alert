@@ -11,8 +11,9 @@ def load_config():
     try:
         db = StockDatabase()
         
-        # ntfy 설정 (전역 기본값, 실제로는 사용자별 토픽 사용)
-        ntfy_server = db.get_setting('ntfy_server', 'https://ntfy.sh')
+        # 텔레그램 설정
+        bot_token = db.get_setting('bot_token')
+        default_chat_id = db.get_setting('default_chat_id')
         
         # 투자 설정
         default_amount = db.get_setting('default_investment_amount', '1000000')
@@ -20,8 +21,9 @@ def load_config():
         db.close()
         
         return {
-            'NTFY_CONFIG': {
-                'SERVER': ntfy_server,
+            'TELEGRAM_CONFIG': {
+                'BOT_TOKEN': bot_token,
+                'CHAT_ID': default_chat_id,
             },
             'INVESTMENT_CONFIG': {
                 'default_amount': int(default_amount),
@@ -29,10 +31,12 @@ def load_config():
         }
     except Exception as e:
         print(f"⚠️  설정 로드 실패: {e}")
+        print("user_manager.py를 실행하여 봇 설정을 입력하세요.")
         # 기본값 반환
         return {
-            'NTFY_CONFIG': {
-                'SERVER': 'https://ntfy.sh',
+            'TELEGRAM_CONFIG': {
+                'BOT_TOKEN': None,
+                'CHAT_ID': None,
             },
             'INVESTMENT_CONFIG': {
                 'default_amount': 1000000,
@@ -42,7 +46,7 @@ def load_config():
 
 # 설정 로드
 _config = load_config()
-NTFY_CONFIG = _config['NTFY_CONFIG']
+TELEGRAM_CONFIG = _config['TELEGRAM_CONFIG']
 INVESTMENT_CONFIG = _config['INVESTMENT_CONFIG']
 
 
@@ -62,3 +66,4 @@ ALERT_CONFIG = {
     'send_buy_signals': True,       # 매수 신호 전송
     'alert_threshold': 0.8,         # 표준편차의 80% 이상 하락 시 알림
 }
+
