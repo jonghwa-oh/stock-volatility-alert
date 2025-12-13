@@ -64,13 +64,17 @@
                     </div>
                     <div class="text-right">
                         <p class="font-medium">
-                            {% if stock.country == 'KR' %}
-                            {{ "{:,.0f}".format(stock.target_05x) }}원
+                            {% if stock.target_05x %}
+                                {% if stock.country == 'KR' %}
+                                {{ "{:,.0f}".format(stock.target_05x) }}원
+                                {% else %}
+                                ${{ "{:,.2f}".format(stock.target_05x) }}
+                                {% endif %}
                             {% else %}
-                            ${{ "{:,.2f}".format(stock.target_05x) }}
+                            -
                             {% endif %}
                         </p>
-                        <p class="text-xs text-red-400">▼{{ "{:.1f}".format(stock.drop_05x) }}%</p>
+                        <p class="text-xs text-red-400">{% if stock.drop_05x %}▼{{ "{:.1f}".format(stock.drop_05x) }}%{% endif %}</p>
                     </div>
                 </div>
                 
@@ -82,13 +86,17 @@
                     </div>
                     <div class="text-right">
                         <p class="font-medium">
-                            {% if stock.country == 'KR' %}
-                            {{ "{:,.0f}".format(stock.target_1x) }}원
+                            {% if stock.target_1x %}
+                                {% if stock.country == 'KR' %}
+                                {{ "{:,.0f}".format(stock.target_1x) }}원
+                                {% else %}
+                                ${{ "{:,.2f}".format(stock.target_1x) }}
+                                {% endif %}
                             {% else %}
-                            ${{ "{:,.2f}".format(stock.target_1x) }}
+                            -
                             {% endif %}
                         </p>
-                        <p class="text-xs text-red-400">▼{{ "{:.1f}".format(stock.drop_1x) }}%</p>
+                        <p class="text-xs text-red-400">{% if stock.drop_1x %}▼{{ "{:.1f}".format(stock.drop_1x) }}%{% endif %}</p>
                     </div>
                 </div>
                 
@@ -100,13 +108,17 @@
                     </div>
                     <div class="text-right">
                         <p class="font-medium">
-                            {% if stock.country == 'KR' %}
-                            {{ "{:,.0f}".format(stock.target_2x) }}원
+                            {% if stock.target_2x %}
+                                {% if stock.country == 'KR' %}
+                                {{ "{:,.0f}".format(stock.target_2x) }}원
+                                {% else %}
+                                ${{ "{:,.2f}".format(stock.target_2x) }}
+                                {% endif %}
                             {% else %}
-                            ${{ "{:,.2f}".format(stock.target_2x) }}
+                            -
                             {% endif %}
                         </p>
-                        <p class="text-xs text-red-400">▼{{ "{:.1f}".format(stock.drop_2x) }}%</p>
+                        <p class="text-xs text-red-400">{% if stock.drop_2x %}▼{{ "{:.1f}".format(stock.drop_2x) }}%{% endif %}</p>
                     </div>
                 </div>
             </div>

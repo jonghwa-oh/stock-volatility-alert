@@ -661,6 +661,20 @@ class StockDatabase:
             (AlertHistory.alert_date == alert_date) &
             (AlertHistory.alert_level == alert_level)
         ).exists()
+    
+    def get_alerts_by_ticker(self, user_id: int, limit: int = 100) -> Dict[str, List[Dict]]:
+        """종목별 알림 내역 조회 (그룹화)"""
+        alerts = self.get_user_alerts(user_id, limit=limit)
+        
+        # 종목별로 그룹화
+        by_ticker = {}
+        for alert in alerts:
+            ticker = alert['ticker']
+            if ticker not in by_ticker:
+                by_ticker[ticker] = []
+            by_ticker[ticker].append(alert)
+        
+        return by_ticker
 
 
 # 테스트
