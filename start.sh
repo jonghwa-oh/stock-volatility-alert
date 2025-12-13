@@ -12,21 +12,6 @@ log "=================================="
 log "🔧 DEBUG_MODE: ${DEBUG_MODE:-false}"
 log "=================================="
 
-# 0. matplotlib 캐시 삭제 및 폰트 확인
-log ""
-log "🔧 폰트 설정 초기화..."
-rm -rf /root/.cache/matplotlib 2>/dev/null
-rm -rf ~/.cache/matplotlib 2>/dev/null
-
-# 폰트 확인
-FONT_PATH=$(fc-list | grep -i nanum | head -1 | cut -d: -f1)
-if [ -n "$FONT_PATH" ]; then
-    log "✅ 나눔 폰트 발견: $FONT_PATH"
-else
-    log "⚠️ 나눔 폰트를 찾지 못했습니다"
-    fc-list | head -5
-fi
-
 # 1. DB 데이터 확인
 log "📊 데이터 확인 중..."
 DATA_COUNT=$(python -c "
@@ -57,38 +42,6 @@ else
     log "✅ 데이터 있음 (수집 건너뛰기)"
 fi
 
-# 2.5 등록된 사용자 및 종목 정보 출력
-log ""
-log "=================================="
-log "👥 등록된 사용자 및 관심 종목"
-log "=================================="
-python -c "
-from database import StockDatabase
-db = StockDatabase()
-
-users = db.get_all_users()
-print(f'📊 총 {len(users)}명의 사용자')
-print('')
-
-for user in users:
-    name = user['name']
-    enabled = '✅' if user['enabled'] else '❌'
-    notif = '🔔' if user.get('notification_enabled', 1) else '🔕'
-    invest = int(user['investment_amount'])
-    print(f'{enabled} {name} ({notif} 알림) - 투자금: {invest:,}원')
-    
-    # 관심 종목
-    watchlist = db.get_user_watchlist_with_names(name)
-    if watchlist:
-        tickers = ', '.join([s['ticker'] for s in watchlist])
-        print(f'   └─ 관심 종목 ({len(watchlist)}개): {tickers}')
-    else:
-        print(f'   └─ 관심 종목: 없음')
-    print('')
-
-db.close()
-"
-
 # 3. 일일 업데이트 스케줄러 백그라운드 실행
 log ""
 log "=================================="
@@ -110,7 +63,31 @@ else
     exit 1
 fi
 
-# 4. 실시간 모니터링 시작
+# 4. 텔레그램 봇 커맨드 핸들러 백그라운드 실행
+log ""
+log "=================================="
+log "🤖 텔레그램 봇 커맨드 핸들러 시작"
+log "=================================="
+python telegram_bot_commands.py > /app/logs/telegram_bot.log 2>&1 &
+BOT_PID=$!
+log "✅ 봇 시작 완료!"
+log "   PID: $BOT_PID"
+log "   로그: /app/logs/telegram_bot.log"
+sleep 3
+
+# 프로세스 확인 (kill -0은 ps 명령어가 없어도 작동)
+if kill -0 $BOT_PID 2>/dev/null; then
+    log "✅ 텔레그램 봇 정상 실행 중"
+    log ""
+    log "📋 봇 초기화 로그:"
+    tail -20 /app/logs/telegram_bot.log
+else
+    log "❌ 텔레그램 봇 시작 실패!"
+    cat /app/logs/telegram_bot.log
+    exit 1
+fi
+
+# 5. 실시간 모니터링 시작
 log ""
 log "=================================="
 log "🎯 실시간 모니터링 시작"
@@ -126,5 +103,6 @@ log "=================================="
 log "⚠️  종료 중..."
 log "=================================="
 kill $UPDATER_PID 2>/dev/null && log "✅ 스케줄러 종료"
+kill $BOT_PID 2>/dev/null && log "✅ 봇 종료"
 log "👋 정상 종료되었습니다."
 

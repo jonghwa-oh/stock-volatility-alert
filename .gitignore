@@ -54,7 +54,3 @@ terminals/
 # OS
 Thumbs.db
 .DS_Store
-
-# Jellyfin & Media
-jellyfin/
-media/

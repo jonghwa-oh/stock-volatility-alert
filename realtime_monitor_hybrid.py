@@ -1,8 +1,8 @@
 """
 하이브리드 실시간 매수 알림 시스템
-- 한국 주식: WebSocket 실시간 모니터링 (09:00~15:30)
-- 미국 주식: 분봉 데이터 모니터링 (22:30~06:00, 서머타임시 23:30~07:00)
-- DEBUG_MODE=true로 24시간 활성화 가능
+- 한국 주식: WebSocket 실시간 모니터링
+- 미국 주식: 분봉 데이터 모니터링
+- 알림 시간: 09:00~24:00 (DEBUG_MODE=true로 24시간 활성화 가능)
 """
 import asyncio
 from datetime import datetime, time
@@ -10,7 +10,7 @@ from pathlib import Path
 from kis_websocket import KISWebSocket
 from database import StockDatabase
 from volatility_analysis import analyze_daily_volatility
-from notification import send_stock_alert_to_all
+from telegram_bot import send_telegram_sync
 from config import load_config
 import FinanceDataReader as fdr
 import os
@@ -24,6 +24,7 @@ class HybridRealtimeMonitor:
         self.db = StockDatabase()
         self.ws = None  # WebSocket (한국 주식용)
         self.config = load_config()
+        self.telegram_config = self.config['TELEGRAM_CONFIG']
         
         # 종목별 매수 목표가 캐시
         self.target_prices = {}  # {ticker: {'1x': price, '2x': price, 'name': name, 'country': country}}
@@ -34,48 +35,20 @@ class HybridRealtimeMonitor:
         # 디버그 모드 (시간 제한 없음)
         self.debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
         
-        # 한국장 시간 (09:00 ~ 15:30)
-        self.kr_market_start = time(9, 0)
-        self.kr_market_end = time(15, 30)
-        
-        # 미국장 시간 (한국시간 기준)
-        # 겨울 (11월~3월): 23:30 ~ 06:00
-        # 여름 (3월~11월): 22:30 ~ 05:00
-        # 간단하게 22:30 ~ 07:00로 설정 (여유있게)
-        self.us_market_start_evening = time(22, 30)  # 저녁 시작
-        self.us_market_end_morning = time(7, 0)      # 아침 종료
+        # 알림 시간 설정
+        self.alert_start_time = time(8, 0)   # 08:00
+        self.alert_end_time = time(23, 59)   # 24:00
         
         if self.debug_mode:
             log_debug("DEBUG MODE: 24시간 알림 활성화")
     
-    def _is_kr_market_hours(self) -> bool:
-        """한국 장 시간 확인 (09:00~15:30)"""
-        now = datetime.now().time()
-        return self.kr_market_start <= now <= self.kr_market_end
-    
-    def _is_us_market_hours(self) -> bool:
-        """미국 장 시간 확인 (22:30~07:00, 한국시간)"""
-        now = datetime.now().time()
-        # 22:30 ~ 23:59 또는 00:00 ~ 07:00
-        return now >= self.us_market_start_evening or now <= self.us_market_end_morning
-    
-    def _is_alert_time(self, country: str = None) -> bool:
-        """알림 가능 시간 확인"""
+    def _is_alert_time(self) -> bool:
+        """알림 가능 시간 확인 (08:00~24:00, DEBUG_MODE시 항상 true)"""
         if self.debug_mode:
             return True
         
-        # 주말 체크
-        now = datetime.now()
-        if now.weekday() >= 5:  # 토요일(5), 일요일(6)
-            return False
-        
-        if country == 'KR':
-            return self._is_kr_market_hours()
-        elif country == 'US':
-            return self._is_us_market_hours()
-        else:
-            # 국가 미지정시 한국장 또는 미국장 시간이면 True
-            return self._is_kr_market_hours() or self._is_us_market_hours()
+        now = datetime.now().time()
+        return self.alert_start_time <= now <= self.alert_end_time
     
     async def initialize(self):
         """초기화: 종목별 매수 목표가 계산 및 국가 구분"""
@@ -119,8 +92,8 @@ class HybridRealtimeMonitor:
         korean_stocks = {t: s for t, s in unique_stocks.items() if s['country'] == 'KR'}
         us_stocks = {t: s for t, s in unique_stocks.items() if s['country'] == 'US'}
         
-        print(f"🇰🇷 한국 주식: {len(korean_stocks)}개 (WebSocket, 09:00~15:30)")
-        print(f"🇺🇸 미국 주식: {len(us_stocks)}개 (폴링, 22:30~07:00)")
+        print(f"🇰🇷 한국 주식: {len(korean_stocks)}개 (WebSocket)")
+        print(f"🇺🇸 미국 주식: {len(us_stocks)}개 (분봉 모니터링)")
         
         # 매수 목표가 계산
         for ticker, info in unique_stocks.items():
@@ -141,8 +114,7 @@ class HybridRealtimeMonitor:
                         'country': country,
                         'drop_05x': data['drop_05x'],
                         'drop_1x': data['drop_1x'],
-                        'drop_2x': data['drop_2x'],
-                        'prev_close': data['current_price']  # 분석 시점 종가 = 전일 종가
+                        'drop_2x': data['drop_2x']
                     }
                     
                     flag = '🇰🇷' if country == 'KR' else '🇺🇸'
@@ -187,10 +159,9 @@ class HybridRealtimeMonitor:
         
         targets = self.target_prices[ticker]
         name = targets['name']
-        country = targets['country']
         
-        # 알림 시간 체크 (국가별)
-        is_alert_time = self._is_alert_time(country)
+        # 알림 시간 체크
+        is_alert_time = self._is_alert_time()
         
         # 테스트 매수 목표가 도달 확인 (0.5x)
         if current_price <= targets['05x']:
@@ -206,84 +177,104 @@ class HybridRealtimeMonitor:
     
     async def _send_buy_alert(self, ticker: str, name: str, current_price: float, level: str, targets: dict, send_now: bool = True):
         """
-        매수 알림 전송 또는 DB 기록 (사용자별 중복 체크)
+        매수 알림 전송 또는 DB 기록
         
         Args:
             send_now: True면 즉시 전송, False면 DB에만 기록
         """
-        from notification import send_stock_alert_to_all_with_check
-        
-        # 중복 알림 방지 (5분 내 동일 종목+레벨 알림 방지 - 메모리 캐시)
+        # 중복 알림 방지 (5분 내 동일 레벨 알림 방지)
         now = datetime.now()
-        cache_key = f"{ticker}_{level}"
-        if cache_key in self.alert_history:
-            last_alert = self.alert_history[cache_key]
-            if (now - last_alert).seconds < 300:  # 5분
+        if ticker in self.alert_history:
+            last_alert = self.alert_history[ticker].get(level)
+            if last_alert and (now - last_alert).seconds < 300:  # 5분
                 return
         
-        # 알림 레벨 텍스트
+        # 알림 메시지 구성
         if level == '05x':
-            level_text = "테스트"
-            sigma = 0.5
+            level_text = "🧪 테스트"
         elif level == '1x':
             level_text = "1차"
-            sigma = 1.0
         else:
             level_text = "2차"
-            sigma = 2.0
         
         target_price = targets[level]
         drop_rate = targets[f'drop_{level}']
         country = targets['country']
-        prev_close = targets.get('prev_close')
+        flag = '🇰🇷' if country == 'KR' else '🇺🇸'
         
-        # 알림 전송 (사용자별 중복 체크 + DB 저장 포함)
-        if send_now:
-            try:
-                success_count, skip_count = send_stock_alert_to_all_with_check(
-                    ticker=ticker,
-                    name=name,
-                    current_price=current_price,
-                    target_price=target_price,
-                    signal_type=f"{level_text} 매수",
-                    sigma=sigma,
-                    country=country,
-                    prev_close=prev_close,
-                    alert_level=level,
-                    drop_rate=drop_rate
-                )
-                
-                if success_count > 0:
-                    print(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송 ({success_count}명)")
-                if skip_count > 0:
-                    print(f"⏭️ {name} ({ticker}) {level_text} 중복 스킵 ({skip_count}명)")
-                if success_count == 0 and skip_count == 0:
-                    print(f"⚠️ {name} ({ticker}) 알림 대상 사용자 없음")
-                    
-            except Exception as e:
-                print(f"❌ 알림 전송 실패: {e}")
-                import traceback
-                traceback.print_exc()
+        # 통화 단위 결정
+        if country == 'KR':
+            price_format = f"{current_price:,.0f}원"
+            target_format = f"{target_price:,.0f}원"
         else:
-            # 알림 시간 외에는 DB에만 기록 (중복 체크 포함)
-            success_count, skip_count = send_stock_alert_to_all_with_check(
-                ticker=ticker,
-                name=name,
-                current_price=current_price,
-                target_price=target_price,
-                signal_type=f"{level_text} 매수",
-                sigma=sigma,
-                country=country,
-                prev_close=prev_close,
-                alert_level=level,
-                drop_rate=drop_rate
-            )
-            # sent=False로 저장은 send_stock_alert_to_all_with_check에서 처리하지 않으므로
-            # 여기서는 로그만 출력
-            print(f"💾 {name} ({ticker}) {level_text} 매수 시점 (장외: {now.strftime('%H:%M:%S')})")
+            price_format = f"${current_price:,.2f}"
+            target_format = f"${target_price:,.2f}"
         
-        # 메모리 캐시 업데이트
-        self.alert_history[cache_key] = now
+        message = f"🚨 실시간 매수 알림! {level_text} 매수 시점 도달\n\n"
+        message += f"{flag} {name} ({ticker})\n"
+        message += f"💰 현재가: {price_format}\n"
+        message += f"🎯 목표가: {target_format}\n"
+        message += f"📉 하락률: {drop_rate:.2f}%\n\n"
+        message += f"⏰ {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        
+        if level == '05x':
+            message += "💡 🧪 테스트 매수 타이밍입니다! (0.5배 투자)\n"
+        elif level == '1x':
+            message += "💡 1차 매수 타이밍입니다!\n"
+        else:
+            message += "💡 2차 매수 타이밍입니다! (2배 투자)\n"
+        
+        message += "\n📊 차트는 오늘 아침 알림을 확인하세요"
+        
+        # DB에 기록 (알림 시간 여부와 상관없이 항상)
+        conn = self.db.connect()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO alert_history 
+            (ticker, ticker_name, country, alert_level, target_price, current_price, drop_rate, alert_time, sent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (ticker, name, country, level, target_price, current_price, drop_rate, now.isoformat(), 1 if send_now else 0))
+        conn.commit()
+        
+        # 알림 전송 (알림 시간일 때만)
+        if send_now:
+            users = self.db.get_all_users()
+            
+            for user in users:
+                # 사용자 활성화 체크
+                if not user['enabled']:
+                    continue
+                
+                # 알림 활성화 체크
+                notification_enabled = user.get('notification_enabled', 1)
+                if not notification_enabled:
+                    print(f"  ⏸️  {user['name']} - 알림 비활성화 상태 (건너뜀)")
+                    continue
+                
+                # 해당 사용자가 이 종목을 관심 종목으로 가지고 있는지 확인
+                cursor.execute('''
+                    SELECT COUNT(*) FROM user_watchlist 
+                    WHERE user_id = ? AND ticker = ? AND enabled = 1
+                ''', (user['id'], ticker))
+                
+                if cursor.fetchone()[0] == 0:
+                    continue
+                
+                try:
+                    send_telegram_sync(
+                        self.telegram_config['BOT_TOKEN'],
+                        self.telegram_config['CHAT_ID'],
+                        message=message
+                    )
+                    print(f"  ✅ {user['name']}님에게 {level_text} 매수 알림 전송")
+                    
+                except Exception as e:
+                    print(f"  ❌ {user['name']}님 알림 전송 실패: {e}")
+            
+            print(f"🚨 {name} ({ticker}) {level_text} 매수 알림 전송")
+        else:
+            # 알림 시간 외에는 DB에만 기록
+            print(f"💾 {name} ({ticker}) {level_text} 매수 시점 기록 (알림 시간 외: {now.strftime('%H:%M:%S')})")
         
         # 알림 이력 기록 (중복 방지용)
         if ticker not in self.alert_history:
@@ -309,20 +300,6 @@ class HybridRealtimeMonitor:
             async def price_callback(price_info):
                 ticker = price_info['ticker']
                 current_price = price_info['current_price']
-                
-                # 분봉 데이터 DB 저장
-                if ticker in korean_stocks:
-                    try:
-                        self.db.insert_minute_price(
-                            ticker=ticker,
-                            ticker_name=korean_stocks[ticker]['name'],
-                            datetime_str=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            price=current_price,
-                            volume=price_info.get('volume', 0)
-                        )
-                    except Exception as e:
-                        log_debug(f"  분봉 저장 오류 ({ticker}): {e}")
-                
                 await self.check_and_alert(ticker, current_price)
             
             # 종목별 구독
@@ -355,10 +332,9 @@ class HybridRealtimeMonitor:
             print(f"     FinanceDataReader로 대체합니다.")
         
         while True:
-            # 미국장 시간 체크
-            if not self._is_alert_time('US'):
-                now_time = datetime.now().strftime('%H:%M')
-                log_debug(f"미국장 시간 외 ({now_time}) - 22:30~07:00만 모니터링")
+            # 알림 시간 체크
+            if not self._is_alert_time():
+                log_warning("알림 시간 외 (08:00~24:00만 알림, DEBUG_MODE로 우회 가능)")
                 await asyncio.sleep(60)
                 continue
             
@@ -369,7 +345,8 @@ class HybridRealtimeMonitor:
                     # 1순위: KIS API
                     if kis_api:
                         try:
-                            price_info = kis_api.get_overseas_stock_price_auto(ticker)
+                            exchange = kis_api.get_exchange_code(ticker)
+                            price_info = kis_api.get_overseas_stock_price(ticker, exchange)
                             if price_info:
                                 current_price = price_info['current_price']
                         except Exception as e:
@@ -377,27 +354,12 @@ class HybridRealtimeMonitor:
                     
                     # 2순위: FDR (Fallback)
                     if current_price is None:
-                        try:
-                            df = fdr.DataReader(ticker, datetime.now().date(), datetime.now())
-                            if df is not None and not df.empty:
-                                current_price = float(df['Close'].iloc[-1])
-                        except Exception as e:
-                            log_debug(f"  FDR 오류 ({ticker}): {e}")
+                        df = fdr.DataReader(ticker, datetime.now().date(), datetime.now())
+                        if df is not None and not df.empty:
+                            current_price = float(df['Close'].iloc[-1])
                     
-                    # 알림 확인 + 분봉 데이터 저장
+                    # 알림 확인
                     if current_price:
-                        # 분봉 데이터 DB 저장
-                        try:
-                            self.db.insert_minute_price(
-                                ticker=ticker,
-                                ticker_name=targets['name'],
-                                datetime_str=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                price=current_price,
-                                volume=0
-                            )
-                        except Exception as e:
-                            log_debug(f"  분봉 저장 오류 ({ticker}): {e}")
-                        
                         await self.check_and_alert(ticker, current_price)
                 
                 except Exception as e:
@@ -412,8 +374,7 @@ class HybridRealtimeMonitor:
         print("👂 하이브리드 실시간 모니터링 시작!")
         print("="*70)
         print(f"📊 모니터링 종목: {len(self.target_prices)}개")
-        print(f"🇰🇷 한국장: 09:00 ~ 15:30")
-        print(f"🇺🇸 미국장: 22:30 ~ 07:00 (한국시간)")
+        print(f"⏰ 알림 시간: {self.alert_start_time.strftime('%H:%M')} ~ {self.alert_end_time.strftime('%H:%M')}")
         print(f"⏰ 시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("\n💡 Ctrl+C로 종료")
         print("="*70)
@@ -469,12 +430,12 @@ if __name__ == "__main__":
     log_section("🚀 하이브리드 실시간 매수 알림 시스템")
     
     debug_mode = os.environ.get('DEBUG_MODE', 'false').lower() == 'true'
+    time_info = "24시간 (DEBUG_MODE)" if debug_mode else "08:00~24:00"
     
     log("")
-    log("🇰🇷 한국 주식: WebSocket 실시간 모니터링 (09:00~15:30)")
-    log("🇺🇸 미국 주식: 1분 간격 폴링 모니터링 (22:30~07:00)")
-    if debug_mode:
-        log("⚠️  DEBUG MODE: 24시간 활성화")
+    log("🇰🇷 한국 주식: WebSocket 실시간 모니터링")
+    log("🇺🇸 미국 주식: 1분 간격 폴링 모니터링")
+    log(f"⏰ 알림 시간: {time_info}")
     log("")
     log("실시간으로 가격을 모니터링하여")
     log("0.5-sigma, 1-sigma, 2-sigma 매수 타이밍을 즉시 알려드립니다!")
@@ -482,3 +443,4 @@ if __name__ == "__main__":
     
     # 실행
     asyncio.run(main())
+
