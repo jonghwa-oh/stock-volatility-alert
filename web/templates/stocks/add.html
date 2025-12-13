@@ -12,14 +12,14 @@
             <div>
                 <label class="block text-sm font-medium text-slate-300 mb-2">국가</label>
                 <div class="grid grid-cols-2 gap-3">
-                    <label @click="country = 'US'; search()"
+                    <label @click="country = 'US'; investmentAmount = 1000; search()"
                            class="flex items-center justify-center gap-2 p-4 bg-slate-700 rounded-xl cursor-pointer
                                   border-2 transition-colors"
                            :class="country === 'US' ? 'border-blue-500' : 'border-transparent'">
                         <span class="text-2xl">🇺🇸</span>
                         <span>미국</span>
                     </label>
-                    <label @click="country = 'KR'; search()"
+                    <label @click="country = 'KR'; investmentAmount = 1000000; search()"
                            class="flex items-center justify-center gap-2 p-4 bg-slate-700 rounded-xl cursor-pointer
                                   border-2 transition-colors"
                            :class="country === 'KR' ? 'border-blue-500' : 'border-transparent'">
@@ -245,7 +245,7 @@ function stockSearch() {
         verifying: false,
         verifiedStock: null,
         verifyError: '',
-        investmentAmount: null,
+        investmentAmount: 1000,  // 미국 기본값 $1,000
         
         async search() {
             if (this.query.length < 1) {
