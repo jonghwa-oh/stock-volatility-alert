@@ -123,10 +123,6 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
         print(f"      0.5σ: {target_05x:,.0f}원 ({drop_05x:.2f}% 하락)")
         print(f"      1σ:   {target_1x:,.0f}원 ({drop_1x:.2f}% 하락)")
         print(f"      2σ:   {target_2x:,.0f}원 ({drop_2x:.2f}% 하락)")
-    else:
-        print(f"      0.5σ: {analysis['target_05x']:,.0f}원 ({analysis['drop_05x']:.2f}% 하락)")
-        print(f"      1σ:   {analysis['target_1x']:,.0f}원 ({analysis['drop_1x']:.2f}% 하락)")
-        print(f"      2σ:   {analysis['target_2x']:,.0f}원 ({analysis['drop_2x']:.2f}% 하락)")
     
     # 2. 해당 날짜 분봉 데이터 가져오기
     print(f"\n[2] 📊 {target_date} 분봉 데이터 조회...")
