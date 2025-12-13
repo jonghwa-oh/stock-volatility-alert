@@ -592,8 +592,8 @@ class StockDatabase:
             return {
                 'id': result[0],
                 'name': result[1],
-                'enabled': result[3],
-                'ntfy_topic': result[4]
+                'enabled': result[2],
+                'ntfy_topic': result[3]
             }
         return None
     
