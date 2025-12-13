@@ -43,6 +43,10 @@ docs/
 *.md
 !README.md
 
+# 미디어 서버 (Jellyfin)
+jellyfin/
+media/
+
 # 기타
 terminals/
 
