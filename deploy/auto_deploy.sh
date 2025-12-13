@@ -24,24 +24,9 @@ trap "rm -f $LOCK_FILE" EXIT
 
 cd "$PROJECT_PATH" || { rm -f "$LOCK_FILE"; exit 1; }
 
-# config.py에서 텔레그램 설정 추출
-BOT_TOKEN=$(grep -oP "BOT_TOKEN.*?['\"]([^'\"]+)['\"]" config.py | grep -oP "['\"][^'\"]+['\"]$" | tr -d "\"'")
-CHAT_ID=$(grep -oP "CHAT_ID.*?['\"]([^'\"]+)['\"]" config.py | grep -oP "['\"][^'\"]+['\"]$" | tr -d "\"'")
-
 # 로그 함수
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
-}
-
-# 텔레그램 메시지 전송
-send_telegram() {
-    local message="$1"
-    if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
-        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${CHAT_ID}" \
-            -d "text=${message}" \
-            -d "parse_mode=HTML" > /dev/null 2>&1
-    fi
 }
 
 # 변경사항 확인
@@ -81,24 +66,14 @@ if [ "$LOCAL" != "$REMOTE" ]; then
     
     log "✅ 배포 완료!"
     
-    # 텔레그램 알림 전송
+    # 커밋 정보
     COMMIT_MSG=$(git log -1 --pretty=format:"%s")
     COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
     
-    send_telegram "🚀 <b>배포 완료!</b>
-
-📦 변경된 파일: ${CHANGED_COUNT}개
-🔧 빌드: ${BUILD_TYPE}
-💬 커밋: ${COMMIT_MSG}
-👤 작성자: ${COMMIT_AUTHOR}
-⏰ 시간: $(date '+%Y-%m-%d %H:%M:%S')"
-
+    log "📦 변경된 파일: ${CHANGED_COUNT}개"
+    log "🔧 빌드: ${BUILD_TYPE}"
+    log "💬 커밋: ${COMMIT_MSG}"
+    log "👤 작성자: ${COMMIT_AUTHOR}"
 fi
 
 # Lock 파일은 trap에 의해 자동 삭제됨
-
-
-
-
-
-

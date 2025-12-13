@@ -13,13 +13,13 @@ class UserManager:
     def __init__(self):
         self.db = StockDatabase()
     
-    def add_user(self, name: str, chat_id: str, investment_amount: float = 1000000):
+    def add_user(self, name: str, investment_amount: float = 1000000, ntfy_topic: str = None):
         """새 사용자 추가"""
-        user_id = self.db.add_user(name, chat_id, investment_amount)
+        user_id = self.db.add_user(name, investment_amount, ntfy_topic)
         if user_id:
             print(f"\n✅ 사용자 추가 완료!")
             print(f"   • 이름: {name}")
-            print(f"   • Chat ID: {chat_id}")
+            print(f"   • ntfy 토픽: {ntfy_topic or '(미설정)'}")
             print(f"   • 투자 금액: {investment_amount:,.0f}원")
             return True
         return False
@@ -38,7 +38,7 @@ class UserManager:
         
         for user in users:
             print(f"\n📱 {user['name']}")
-            print(f"   • Chat ID: {user['chat_id']}")
+            print(f"   • ntfy 토픽: {user.get('ntfy_topic') or '(미설정)'}")
             print(f"   • 투자 금액: {user['investment_amount']:,.0f}원")
             
             # 관심 종목
@@ -85,7 +85,7 @@ class UserManager:
         print("\n" + "="*60)
         print(f"📱 {user['name']} 상세 정보")
         print("="*60)
-        print(f"Chat ID: {user['chat_id']}")
+        print(f"ntfy 토픽: {user.get('ntfy_topic') or '(미설정)'}")
         print(f"투자 금액: {user['investment_amount']:,.0f}원")
         print(f"상태: {'활성화' if user['enabled'] else '비활성화'}")
         
@@ -97,6 +97,13 @@ class UserManager:
                 print(f"  • {item['ticker']}: {item['name']}")
         else:
             print("  (없음)")
+    
+    def set_ntfy_topic(self, user_name: str, ntfy_topic: str):
+        """사용자 ntfy 토픽 설정"""
+        if self.db.set_user_ntfy_topic(user_name, ntfy_topic):
+            print(f"\n✅ {user_name}의 ntfy 토픽 설정: {ntfy_topic}")
+            return True
+        return False
     
     def close(self):
         """DB 연결 종료"""
@@ -118,9 +125,10 @@ def interactive_setup():
         print("  3. 관심 종목 제거")
         print("  4. 사용자 목록")
         print("  5. 사용자 상세")
-        print("  6. 종료")
+        print("  6. ntfy 토픽 설정")
+        print("  7. 종료")
         
-        choice = input("\n선택 (1-6): ").strip()
+        choice = input("\n선택 (1-7): ").strip()
         
         if choice == '1':
             # 사용자 추가
@@ -133,15 +141,12 @@ def interactive_setup():
                 print("❌ 이름을 입력하세요")
                 continue
             
-            chat_id = input("텔레그램 Chat ID: ").strip()
-            if not chat_id:
-                print("❌ Chat ID를 입력하세요")
-                continue
+            ntfy_topic = input("ntfy 토픽 (예: stock-alert-dad): ").strip() or None
             
             amount_input = input("투자 금액 (기본 1,000,000원): ").strip()
             amount = float(amount_input) if amount_input else 1000000
             
-            manager.add_user(name, chat_id, amount)
+            manager.add_user(name, amount, ntfy_topic)
         
         elif choice == '2':
             # 관심 종목 추가
@@ -176,6 +181,13 @@ def interactive_setup():
                 manager.show_user_detail(name)
         
         elif choice == '6':
+            # ntfy 토픽 설정
+            name = input("사용자 이름: ").strip()
+            topic = input("ntfy 토픽: ").strip()
+            if name and topic:
+                manager.set_ntfy_topic(name, topic)
+        
+        elif choice == '7':
             # 종료
             print("\n✅ 종료합니다.")
             break
@@ -194,13 +206,13 @@ def quick_setup_family():
     print("👨‍👩‍👦 가족용 빠른 설정")
     print("="*60)
     print("\n3명의 사용자를 설정합니다.")
-    print("각자의 텔레그램 Chat ID가 필요합니다.\n")
+    print("각자의 ntfy 토픽이 필요합니다.\n")
     
     # 아빠
     print("1️⃣ 첫 번째 사용자 (본인)")
-    dad_chat_id = input("  텔레그램 Chat ID: ").strip()
-    if dad_chat_id:
-        manager.add_user("아빠", dad_chat_id, 1000000)
+    ntfy_topic = input("  ntfy 토픽 (예: stock-alert-dad): ").strip()
+    if ntfy_topic:
+        manager.add_user("아빠", 1000000, ntfy_topic)
         
         print("\n관심 종목 추가:")
         print("  추천: 레버리지 ETF (TQQQ, SOXL, QLD)")
@@ -211,9 +223,9 @@ def quick_setup_family():
     
     # 엄마
     print("\n2️⃣ 두 번째 사용자 (배우자)")
-    mom_chat_id = input("  텔레그램 Chat ID: ").strip()
-    if mom_chat_id:
-        manager.add_user("엄마", mom_chat_id, 1000000)
+    ntfy_topic = input("  ntfy 토픽 (예: stock-alert-mom): ").strip()
+    if ntfy_topic:
+        manager.add_user("엄마", 1000000, ntfy_topic)
         
         print("\n관심 종목 추가:")
         print("  추천: 안정적인 ETF (SPY, QQQ, VOO)")
@@ -224,9 +236,9 @@ def quick_setup_family():
     
     # 아들
     print("\n3️⃣ 세 번째 사용자 (자녀)")
-    son_chat_id = input("  텔레그램 Chat ID: ").strip()
-    if son_chat_id:
-        manager.add_user("아들", son_chat_id, 500000)
+    ntfy_topic = input("  ntfy 토픽 (예: stock-alert-son): ").strip()
+    if ntfy_topic:
+        manager.add_user("아들", 500000, ntfy_topic)
         
         print("\n관심 종목 추가:")
         print("  추천: 기술주 ETF (XLK, TECL)")
@@ -263,6 +275,3 @@ if __name__ == "__main__":
         print("  python user_manager.py setup   # 대화형 설정")
         print("  python user_manager.py family  # 빠른 가족 설정")
         print("  python user_manager.py list    # 사용자 목록")
-
-
-

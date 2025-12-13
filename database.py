@@ -86,8 +86,8 @@ class StockDatabase:
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
-                chat_id TEXT NOT NULL,
                 password_hash TEXT,
+                ntfy_topic TEXT,
                 investment_amount REAL DEFAULT 1000000,
                 enabled BOOLEAN DEFAULT 1,
                 notification_enabled BOOLEAN DEFAULT 1,
@@ -462,16 +462,16 @@ class StockDatabase:
     # 사용자 관리
     # ========================================
     
-    def add_user(self, name: str, chat_id: str, investment_amount: float = 1000000):
+    def add_user(self, name: str, investment_amount: float = 1000000, ntfy_topic: str = None):
         """사용자 추가"""
         conn = self.connect()
         cursor = conn.cursor()
         
         try:
             cursor.execute('''
-                INSERT INTO users (name, chat_id, investment_amount)
+                INSERT INTO users (name, investment_amount, ntfy_topic)
                 VALUES (?, ?, ?)
-            ''', (name, chat_id, investment_amount))
+            ''', (name, investment_amount, ntfy_topic))
             conn.commit()
             print(f"✅ 사용자 추가: {name}")
             return cursor.lastrowid
@@ -488,7 +488,7 @@ class StockDatabase:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, name, chat_id, investment_amount, enabled
+            SELECT id, name, investment_amount, enabled, ntfy_topic
             FROM users WHERE name = ?
         ''', (name,))
         
@@ -497,9 +497,9 @@ class StockDatabase:
             return {
                 'id': result[0],
                 'name': result[1],
-                'chat_id': result[2],
-                'investment_amount': result[3],
-                'enabled': result[4]
+                'investment_amount': result[2],
+                'enabled': result[3],
+                'ntfy_topic': result[4]
             }
         return None
     
@@ -510,12 +510,12 @@ class StockDatabase:
         
         if include_disabled:
             cursor.execute('''
-                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
+                SELECT id, name, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
                 FROM users
             ''')
         else:
             cursor.execute('''
-                SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
+                SELECT id, name, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
                 FROM users WHERE enabled = 1
             ''')
         
@@ -524,12 +524,11 @@ class StockDatabase:
             users.append({
                 'id': row[0],
                 'name': row[1],
-                'chat_id': row[2],
-                'investment_amount': row[3],
-                'enabled': row[4],
-                'notification_enabled': row[5] if row[5] is not None else 1,
-                'password_hash': row[6],
-                'ntfy_topic': row[7]
+                'investment_amount': row[2],
+                'enabled': row[3],
+                'notification_enabled': row[4] if row[4] is not None else 1,
+                'password_hash': row[5],
+                'ntfy_topic': row[6]
             })
         return users
     
@@ -714,7 +713,7 @@ class StockDatabase:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, name, chat_id, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
+            SELECT id, name, investment_amount, enabled, notification_enabled, password_hash, ntfy_topic
             FROM users WHERE name = ?
         ''', (name,))
         
@@ -723,12 +722,11 @@ class StockDatabase:
             return {
                 'id': result[0],
                 'name': result[1],
-                'chat_id': result[2],
-                'investment_amount': result[3],
-                'enabled': result[4],
-                'notification_enabled': result[5] if result[5] is not None else 1,
-                'password_hash': result[6],
-                'ntfy_topic': result[7]
+                'investment_amount': result[2],
+                'enabled': result[3],
+                'notification_enabled': result[4] if result[4] is not None else 1,
+                'password_hash': result[5],
+                'ntfy_topic': result[6]
             }
         return None
     
