@@ -117,6 +117,9 @@ def delete_stock(ticker):
 @login_required
 def view_alerts():
     """알림 내역 조회"""
+    from datetime import datetime
+    import pytz
+    
     username = session.get('user')
     ticker_filter = request.args.get('ticker', None)
     
@@ -132,6 +135,38 @@ def view_alerts():
         alerts = db.get_user_alerts(user['id'], ticker=ticker_filter, limit=100)
     else:
         alerts = db.get_user_alerts(user['id'], limit=100)
+    
+    # 시간 변환 (한국: KST 그대로, 미국: KST -> EST/EDT)
+    kst = pytz.timezone('Asia/Seoul')
+    est = pytz.timezone('America/New_York')
+    
+    for alert in alerts:
+        try:
+            # alert_time이 ISO 형식 문자열이라고 가정
+            if alert['alert_time']:
+                dt_str = alert['alert_time']
+                # KST로 파싱 (DB에 KST로 저장되어 있다고 가정)
+                if 'T' in dt_str:
+                    dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
+                
+                # KST로 설정
+                dt_kst = kst.localize(dt) if dt.tzinfo is None else dt
+                
+                if alert['country'] == 'US':
+                    # 미국 주식은 미국 동부 시간으로 변환
+                    dt_local = dt_kst.astimezone(est)
+                    alert['local_time'] = dt_local.strftime('%H:%M:%S')
+                    alert['local_tz'] = '🇺🇸 미국'
+                else:
+                    # 한국 주식은 KST 그대로
+                    alert['local_time'] = dt_kst.strftime('%H:%M:%S')
+                    alert['local_tz'] = '🇰🇷 한국'
+        except Exception as e:
+            print(f"시간 변환 오류: {e}")
+            alert['local_time'] = alert['alert_time'][11:19] if alert['alert_time'] and len(alert['alert_time']) > 19 else ''
+            alert['local_tz'] = ''
     
     # 종목별로 그룹화
     alerts_by_ticker = db.get_alerts_by_ticker(user['id'])

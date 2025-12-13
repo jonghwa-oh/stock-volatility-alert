@@ -1014,32 +1014,45 @@ class StockDatabase:
             limit: 최대 개수
         
         Returns:
-            알림 내역 리스트 (최신순)
+            알림 내역 리스트 (최신순, 투자금액 포함)
         """
         conn = self.connect()
         cursor = conn.cursor()
         
+        # 투자금액도 함께 조회 (user_watchlist 조인)
         if ticker:
             cursor.execute('''
-                SELECT id, ticker, ticker_name, country, alert_level, alert_date,
-                       target_price, current_price, drop_rate, alert_time, sent
-                FROM alert_history 
-                WHERE user_id = ? AND ticker = ?
-                ORDER BY alert_time DESC
+                SELECT ah.id, ah.ticker, ah.ticker_name, ah.country, ah.alert_level, ah.alert_date,
+                       ah.target_price, ah.current_price, ah.drop_rate, ah.alert_time, ah.sent,
+                       uw.investment_amount
+                FROM alert_history ah
+                LEFT JOIN user_watchlist uw ON ah.user_id = uw.user_id AND ah.ticker = uw.ticker
+                WHERE ah.user_id = ? AND ah.ticker = ?
+                ORDER BY ah.alert_time DESC
                 LIMIT ?
             ''', (user_id, ticker, limit))
         else:
             cursor.execute('''
-                SELECT id, ticker, ticker_name, country, alert_level, alert_date,
-                       target_price, current_price, drop_rate, alert_time, sent
-                FROM alert_history 
-                WHERE user_id = ?
-                ORDER BY alert_time DESC
+                SELECT ah.id, ah.ticker, ah.ticker_name, ah.country, ah.alert_level, ah.alert_date,
+                       ah.target_price, ah.current_price, ah.drop_rate, ah.alert_time, ah.sent,
+                       uw.investment_amount
+                FROM alert_history ah
+                LEFT JOIN user_watchlist uw ON ah.user_id = uw.user_id AND ah.ticker = uw.ticker
+                WHERE ah.user_id = ?
+                ORDER BY ah.alert_time DESC
                 LIMIT ?
             ''', (user_id, limit))
         
         alerts = []
         for row in cursor.fetchall():
+            current_price = row[7]
+            investment_amount = row[11]
+            
+            # 매수 수량 계산
+            shares = 0
+            if investment_amount and investment_amount > 0 and current_price and current_price > 0:
+                shares = int(investment_amount / current_price)
+            
             alerts.append({
                 'id': row[0],
                 'ticker': row[1],
@@ -1048,10 +1061,12 @@ class StockDatabase:
                 'alert_level': row[4],
                 'alert_date': row[5],
                 'target_price': row[6],
-                'current_price': row[7],
+                'current_price': current_price,
                 'drop_rate': row[8],
                 'alert_time': row[9],
-                'sent': row[10]
+                'sent': row[10],
+                'investment_amount': investment_amount,
+                'shares': shares
             })
         return alerts
     
