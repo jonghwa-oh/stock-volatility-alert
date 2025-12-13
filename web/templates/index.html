@@ -21,7 +21,8 @@
     {% if stocks %}
     <div class="grid gap-4 sm:grid-cols-2">
         {% for stock in stocks %}
-        <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 card-hover">
+        <a href="{{ url_for('stocks.view_chart', ticker=stock.ticker) }}" 
+           class="block bg-slate-800 rounded-2xl p-5 border border-slate-700 card-hover cursor-pointer">
             <!-- 종목 헤더 -->
             <div class="flex items-start justify-between mb-4">
                 <div>
@@ -116,14 +117,6 @@
                 <span class="font-medium text-slate-200">{{ "{:.2f}".format(stock.volatility) }}%</span>
             </div>
             
-            <!-- 차트 링크 -->
-            {% if stock.chart_path %}
-            <a href="{{ url_for('stocks.view_chart', ticker=stock.ticker) }}"
-               class="block w-full py-3 text-center bg-slate-700 hover:bg-slate-600 rounded-xl transition-colors">
-                📈 차트 보기
-            </a>
-            {% endif %}
-            
             {% else %}
             <!-- 분석 실패 -->
             <div class="text-center py-8 text-slate-500">
@@ -132,7 +125,7 @@
                 <p class="text-sm">{{ stock.error or '데이터를 가져올 수 없습니다' }}</p>
             </div>
             {% endif %}
-        </div>
+        </a>
         {% endfor %}
     </div>
     {% else %}

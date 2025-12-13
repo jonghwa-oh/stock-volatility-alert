@@ -113,3 +113,4 @@ def cleanup_telegram_data(db_path='data/stock_data.db'):
 if __name__ == "__main__":
     cleanup_telegram_data()
 
+

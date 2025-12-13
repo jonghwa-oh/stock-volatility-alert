@@ -62,3 +62,4 @@ def set_default_investment(db_path='data/stock_data.db'):
 if __name__ == "__main__":
     set_default_investment()
 
+

@@ -477,6 +477,104 @@ def verify_ticker():
         })
 
 
+@api_bp.route('/stocks/<ticker>/chart-data')
+@login_required
+def get_chart_data(ticker):
+    """
+    종목 차트 데이터 API (인터랙티브 차트용)
+    
+    Returns:
+        prices: 가격 데이터 (날짜, 시가, 고가, 저가, 종가)
+        targets: 목표가 라인 (0.5σ, 1σ, 2σ)
+        minute_data: 분봉 데이터 (있는 경우)
+    """
+    username = session.get('user')
+    data_type = request.args.get('type', 'daily')  # daily, minute
+    
+    db = StockDatabase()
+    watchlist = db.get_user_watchlist_with_names(username)
+    stock_info = next((s for s in watchlist if s['ticker'] == ticker), None)
+    
+    if not stock_info:
+        db.close()
+        return jsonify({'success': False, 'error': '종목 없음'}), 404
+    
+    try:
+        # 일봉 데이터 + 변동성 분석
+        data = analyze_daily_volatility(ticker, stock_info['name'], country=stock_info['country'], create_chart=False)
+        
+        if not data:
+            db.close()
+            return jsonify({'success': False, 'error': '데이터 없음'}), 404
+        
+        # pandas Series를 JSON 변환 가능 형태로
+        close_prices = data['close_prices']
+        
+        # OHLC 데이터 변환 (FDR로 다시 조회 필요)
+        from datetime import timedelta
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=90)  # 최근 90일
+        
+        df = fdr.DataReader(ticker, start_date, end_date)
+        
+        ohlc_data = []
+        if df is not None and not df.empty:
+            for idx, row in df.iterrows():
+                ohlc_data.append({
+                    'x': idx.strftime('%Y-%m-%d'),
+                    'o': float(row.get('Open', row.get('Close', 0))),
+                    'h': float(row.get('High', row.get('Close', 0))),
+                    'l': float(row.get('Low', row.get('Close', 0))),
+                    'c': float(row.get('Close', 0))
+                })
+        
+        # 분봉 데이터 (있는 경우)
+        minute_data = []
+        if data_type == 'minute':
+            conn = db.connect()
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT datetime, price FROM minute_prices
+                WHERE ticker = ?
+                ORDER BY datetime DESC
+                LIMIT 390
+            ''', (ticker,))
+            
+            for row in cursor.fetchall():
+                minute_data.append({
+                    'x': row[0],
+                    'y': float(row[1])
+                })
+            minute_data.reverse()
+        
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'ticker': ticker,
+                'name': stock_info['name'],
+                'country': stock_info['country'],
+                'current_price': float(data['current_price']),
+                'data_date': data.get('data_date', ''),
+                'targets': {
+                    'target_05x': float(data['target_05x']),
+                    'target_1x': float(data['target_1x']),
+                    'target_2x': float(data['target_2x'])
+                },
+                'volatility': float(data['std_return']),
+                'ohlc': ohlc_data[-60:],  # 최근 60일만
+                'minute': minute_data
+            }
+        })
+        
+    except Exception as e:
+        db.close()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @api_bp.route('/watchlist/investment', methods=['POST'])
 @login_required
 def update_watchlist_investment():
