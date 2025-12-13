@@ -618,10 +618,10 @@ class StockDatabase:
             users.append({
                 'id': row[0],
                 'name': row[1],
-                'enabled': row[3],
-                'notification_enabled': row[4] if row[4] is not None else 1,
-                'password_hash': row[5],
-                'ntfy_topic': row[6]
+                'enabled': row[2],
+                'notification_enabled': row[3] if row[4] is not None else 1,
+                'password_hash': row[4],
+                'ntfy_topic': row[5]
             })
         return users
     
