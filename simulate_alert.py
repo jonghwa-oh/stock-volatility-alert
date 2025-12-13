@@ -53,7 +53,7 @@ def simulate_alerts(ticker: str, target_date: str, send_alert: bool = False):
     
     print(f"   종목: {name} ({ticker})")
     print(f"   국가: {country}")
-    print(f"   기준가: ${analysis['base_price']:.2f}" if country == 'US' else f"   기준가: {analysis['base_price']:,.0f}원")
+    print(f"   현재가: ${analysis['current_price']:.2f}" if country == 'US' else f"   현재가: {analysis['current_price']:,.0f}원")
     print(f"   일일 변동성: {analysis['std_return']:.2f}%")
     print(f"\n   🎯 목표가:")
     if country == 'US':
